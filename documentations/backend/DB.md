@@ -1,14 +1,14 @@
 # Βάση δεδομένων
 
-Το backend (`apps/api`) χρησιμοποιεί **PostgreSQL 18 με PostGIS 3.6**, μέσω του ORM [TypeORM](https://typeorm.io) 1.x (`@nestjs/typeorm`). Η βάση τρέχει τοπικά στο Docker (βλ. [DOCKER.md](../infrastructure/DOCKER.md)).
+Το backend (`apps/api`) χρησιμοποιεί **PostgreSQL 18 με PostGIS 3.6**, μέσω του [Lucid](https://lucid.adonisjs.com), του ORM του AdonisJS. Η βάση τρέχει τοπικά στο Docker (βλ. [DOCKER.md](../infrastructure/DOCKER.md)).
 
-Το schema αλλάζει **μόνο με migrations**. Το `synchronize` του TypeORM είναι κλειστό, οπότε τα entities δεν αλλάζουν ποτέ αυτόματα τη βάση.
+Το schema αλλάζει **μόνο με migrations**. Μετά από κάθε migration, το Adonis ξαναπαράγει αυτόματα το `database/schema.ts`, δηλαδή τις κλάσεις με τις στήλες κάθε πίνακα, και τα models επεκτείνουν αυτές τις κλάσεις.
 
 ## Περιεχόμενα
 
 - [Σύνδεση](#σύνδεση)
 - [Αρχεία](#αρχεία)
-- [Entities](#entities)
+- [Models και το παραγόμενο schema](#models-και-το-παραγόμενο-schema)
 - [Migrations](#migrations)
 - [Γεωχωρικά δεδομένα (PostGIS)](#γεωχωρικά-δεδομένα-postgis)
 - [Το τρέχον schema](#το-τρέχον-schema)
@@ -18,22 +18,16 @@
 
 Τα στοιχεία σύνδεσης είναι στο `apps/api/.env`, που φτιάχνεις από το [.env.example](../../apps/api/.env.example):
 
-```bash
-cp apps/api/.env.example apps/api/.env
-```
-
-| Μεταβλητή     | Default       | Τι ορίζει        |
-| ------------- | ------------- | ---------------- |
-| `DB_HOST`     | `localhost`   | Host της βάσης   |
-| `DB_PORT`     | `5432`        | Port της βάσης   |
-| `DB_USER`     | `geoplatform` | Χρήστης          |
-| `DB_PASSWORD` | `geoplatform` | Κωδικός          |
-| `DB_NAME`     | `geoplatform` | Όνομα βάσης      |
+| Μεταβλητή     | Default       | Τι ορίζει      |
+| ------------- | ------------- | -------------- |
+| `DB_HOST`     | `localhost`   | Host της βάσης |
+| `DB_PORT`     | `5432`        | Port της βάσης |
+| `DB_USER`     | `geoplatform` | Χρήστης        |
+| `DB_PASSWORD` | `geoplatform` | Κωδικός        |
+| `DB_DATABASE` | `geoplatform` | Όνομα βάσης    |
 
 > [!IMPORTANT]
 > Το `DB_PORT` πρέπει να είναι ίδιο με το `POSTGRES_PORT` του root `.env` (αυτό που χρησιμοποιεί το Docker). Αν άλλαξες το port του Docker, π.χ. σε `5434` επειδή το `5432` ήταν πιασμένο, άλλαξέ το και εδώ.
-
-Το `.env` δεν μπαίνει στο git. Το `.env.example` μπαίνει και πρέπει να ενημερώνεται όταν προστίθεται νέα μεταβλητή.
 
 Για να μπεις στη βάση με `psql`:
 
@@ -47,163 +41,174 @@ docker compose exec postgres psql -U geoplatform
 
 | Αρχείο | Τι κάνει |
 | --- | --- |
-| [database.config.ts](../../apps/api/src/database/database.config.ts) | Οι ρυθμίσεις του TypeORM: σύνδεση, λίστα entities, πού βρίσκονται τα migrations. Τις χρησιμοποιούν **και** η εφαρμογή **και** το CLI, ώστε να μη διαφέρουν ποτέ |
-| [data-source.ts](../../apps/api/src/data-source.ts) | Σημείο εισόδου του TypeORM CLI. Διαβάζει το `.env` και φτιάχνει το `DataSource` |
-| [app.module.ts](../../apps/api/src/app.module.ts) | Συνδέει το TypeORM στο Nest (`TypeOrmModule.forRootAsync`) |
-| [src/migrations/](../../apps/api/src/migrations/) | Τα migrations, δηλαδή το ιστορικό αλλαγών του schema |
-| `src/<module>/*.entity.ts` | Τα entities, ένα αρχείο ανά πίνακα, μέσα στο module που τον χρησιμοποιεί |
+| [config/database.ts](../../apps/api/config/database.ts) | Η σύνδεση και πού βρίσκονται τα migrations |
+| [database/migrations/](../../apps/api/database/migrations/) | Τα migrations, δηλαδή το ιστορικό αλλαγών του schema |
+| [database/schema.ts](../../apps/api/database/schema.ts) | **Παράγεται αυτόματα** μετά από κάθε migration. Μην το αλλάζεις με το χέρι |
+| [database/schema_rules.ts](../../apps/api/database/schema_rules.ts) | Κανόνες για το `schema.ts`: τύποι στηλών, στήλες που εξαιρούνται |
+| [app/models/](../../apps/api/app/models/) | Τα models, ένα ανά πίνακα |
+| [app/columns/point.ts](../../apps/api/app/columns/point.ts) | Στήλη για PostGIS Point, εκτεθειμένη ως GeoJSON |
 
-## Entities
+## Models και το παραγόμενο schema
 
-Ένα entity είναι μια κλάση που περιγράφει έναν πίνακα. Παράδειγμα, το [place.entity.ts](../../apps/api/src/places/place.entity.ts):
+Μετά από κάθε `migration:run`, το Adonis διαβάζει τη βάση και γράφει μια κλάση ανά πίνακα στο `database/schema.ts`, π.χ. `PlaceSchema` με όλες τις στήλες. Το model επεκτείνει αυτή την κλάση και προσθέτει μόνο ό,τι δεν παράγεται αυτόματα:
 
 ```ts
-@Entity('places')
-export class Place {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+// app/models/place.ts
+export default class Place extends PlaceSchema {
+  @pointColumn()
+  declare location: Point
 
-  @Column({ type: 'varchar', length: 200 })
-  name: string;
-
-  @Index({ spatial: true })
-  @Column({ type: 'geometry', spatialFeatureType: 'Point', srid: 4326 })
-  location: Point;
-
-  @CreateDateColumn({ type: 'timestamptz' })
-  createdAt: Date;
+  @belongsTo(() => User, { foreignKey: 'createdById' })
+  declare createdBy: BelongsTo<typeof User>
 }
 ```
 
-Κανόνες:
+- Τα ονόματα των στηλών στη βάση είναι `snake_case` (`created_by_id`), και στον κώδικα `camelCase` (`createdById`). Η μετατροπή γίνεται αυτόματα.
+- Όταν ο παραγόμενος τύπος μιας στήλης δεν είναι σωστός, τον διορθώνεις στο `database/schema_rules.ts`, όχι στο `schema.ts`. Παράδειγμα: ο ρόλος, που είναι enum στη βάση:
 
-- **Όνομα πίνακα** στο `@Entity('...')`: πληθυντικός, `snake_case` (π.χ. `places`, `place_categories`).
-- **Δήλωνε πάντα τον τύπο** της στήλης (`type: 'varchar'`, `'integer'`, `'timestamptz'` κ.λπ.). Το TypeORM δεν μαντεύει τον τύπο σωστά σε όλες τις περιπτώσεις, και το migration βγαίνει ακριβώς όπως το θέλεις.
-- **Ημερομηνίες:** `timestamptz` (με ζώνη ώρας), όχι `timestamp`.
-- **IDs:** `@PrimaryGeneratedColumn('uuid')`. Τα UUID παράγονται από το `gen_random_uuid()` της PostgreSQL (ρύθμιση `uuidExtension: 'pgcrypto'`), χωρίς επιπλέον extension.
+  ```ts
+  users: {
+    columns: {
+      role: { tsType: `'admin' | 'user'`, decorators: [{ name: '@column' }] },
+    },
+  },
+  ```
 
-> [!IMPORTANT]
-> Κάθε νέο entity πρέπει να προστεθεί σε **δύο** σημεία:
->
-> 1. Στη λίστα `entities` του [database.config.ts](../../apps/api/src/database/database.config.ts), για να το βλέπουν η εφαρμογή και το CLI των migrations.
-> 2. Στο `TypeOrmModule.forFeature([...])` του module του, για να μπορείς να κάνεις `@InjectRepository(...)`.
->
-> Αν ξεχάσεις το πρώτο, το `migration:generate` δεν θα δει τον πίνακα.
+- Για να ξαναπαραχθεί το `schema.ts` χωρίς migration: `pnpm --filter api ace schema:generate`.
+
+> [!NOTE]
+> Οι default τιμές της βάσης (π.χ. `role = 'user'`) **δεν** εμφανίζονται στο model μετά από `create()`, γιατί το Lucid δεν ξαναδιαβάζει την εγγραφή. Όπου χρειάζεσαι την τιμή αμέσως, δώσ' τη ρητά, όπως στο signup: `User.create({ ..., role: 'user', isActive: true })`.
 
 ## Migrations
 
-Ένα migration είναι ένα αρχείο με δύο συναρτήσεις:
+Ένα migration είναι ένα αρχείο με δύο μεθόδους:
 
-- **`up`**: εφαρμόζει την αλλαγή (π.χ. `CREATE TABLE`).
-- **`down`**: την αναιρεί (π.χ. `DROP TABLE`).
+- **`up`**: εφαρμόζει την αλλαγή (π.χ. `createTable`).
+- **`down`**: την αναιρεί (π.χ. `dropTable`).
 
-Η PostgreSQL κρατάει στον πίνακα `migrations` ποια έχουν ήδη τρέξει, οπότε το `migration:run` εφαρμόζει μόνο τα καινούργια, με τη σειρά. Έτσι κάθε βάση (η δική σου, των συναδέλφων, η production) φτάνει στο ίδιο schema με τα ίδια βήματα, και κάθε αλλαγή φαίνεται στο git.
-
-Το όνομα κάθε αρχείου ξεκινάει με timestamp (π.χ. `1792054036084-CreatePlaces.ts`), που ορίζει τη σειρά εκτέλεσης.
+Ο πίνακας `adonis_schema` κρατάει ποια έχουν τρέξει, οπότε το `migration:run` εφαρμόζει μόνο τα καινούργια, με τη σειρά του ονόματος αρχείου (ξεκινάει με timestamp). Όσα τρέχουν μαζί αποτελούν ένα **batch**, και το `migration:rollback` αναιρεί ολόκληρο το τελευταίο batch.
 
 ### Εντολές
 
-Όλες τρέχουν από το root του repo:
+Όλες τρέχουν από το root του repo. Μέσα στο `apps/api` γράφεις απευθείας `node ace ...`.
 
 | Εντολή | Τι κάνει |
 | --- | --- |
-| `pnpm --filter api migration:run` | Εφαρμόζει όσα migrations δεν έχουν τρέξει ακόμα |
-| `pnpm --filter api migration:show` | Λίστα όλων: `[X]` = έχει τρέξει, `[ ]` = εκκρεμεί |
-| `pnpm --filter api migration:revert` | Αναιρεί το **τελευταίο** migration (τρέχει το `down` του). Ξανατρέξ' το για να αναιρέσεις και το προηγούμενο |
-| `pnpm --filter api migration:generate src/migrations/<Όνομα>` | Συγκρίνει τα entities με τη βάση και γράφει migration με τις διαφορές |
-| `pnpm --filter api migration:create src/migrations/<Όνομα>` | Φτιάχνει άδειο migration, για SQL που γράφεις με το χέρι |
+| `pnpm --filter api ace migration:run` | Εφαρμόζει όσα migrations δεν έχουν τρέξει ακόμα |
+| `pnpm --filter api ace migration:status` | Λίστα όλων: `completed` ή `pending`, και σε ποιο batch |
+| `pnpm --filter api ace migration:rollback` | Αναιρεί το **τελευταίο batch** |
+| `pnpm --filter api ace migration:rollback --batch=0` | Αναιρεί **όλα** τα migrations |
+| `pnpm --filter api ace make:migration <πίνακας>` | Νέο migration για νέο πίνακα, π.χ. `make:migration categories` → `..._create_categories_table.ts` |
+| `pnpm --filter api ace make:migration <πίνακας> --alter` | Νέο migration για αλλαγή σε υπάρχοντα πίνακα → `..._alter_<πίνακας>_table.ts` |
+| `pnpm --filter api ace migration:fresh --drop-types` | **Σβήνει όλους τους πίνακες** και τρέχει όλα τα migrations από την αρχή. Μόνο τοπικά |
 
-Το `<Όνομα>` είναι σε PascalCase και περιγράφει την αλλαγή: `CreatePlaces`, `AddCategoryToPlaces`, `DropLegacyTable`.
-
-> [!NOTE]
-> Τα migrations γράφονται σε TypeScript στο `src/migrations/`, αλλά το CLI τρέχει τον compiled κώδικα στο `dist/`. Γι' αυτό οι εντολές κάνουν πρώτα `nest build`, κάτι που προσθέτει λίγα δευτερόλεπτα. Η επίσημη εναλλακτική του TypeORM (ts-node) δεν δουλεύει αξιόπιστα με TypeScript 6 και ESM.
+Το `--drop-types` χρειάζεται επειδή υπάρχει PostgreSQL enum (`user_role`). Χωρίς αυτό, το `migration:fresh` αποτυγχάνει με `type "user_role" already exists`.
 
 ### Ροή: αλλαγή στο schema
 
-Παράδειγμα: προσθέτουμε στήλη `category` στα places.
+Το Lucid **δεν** παράγει migrations από τα models: τα γράφεις εσύ, και το model ακολουθεί. Παράδειγμα: στήλη `category` στα places.
 
-1. **Άλλαξε το entity** στο `place.entity.ts`:
+1. **Νέο migration:**
+
+   ```bash
+   pnpm --filter api ace make:migration places --alter
+   ```
+
+   Φτιάχνει το `database/migrations/<timestamp>_alter_places_table.ts`, έτοιμο με `alterTable('places', ...)`.
+
+2. **Γράψε την αλλαγή** στο αρχείο που δημιουργήθηκε:
 
    ```ts
-   @Column({ type: 'varchar', length: 50, nullable: true })
-   category: string | null;
+   async up() {
+     this.schema.alterTable(this.tableName, (table) => {
+       table.string('category', 50).nullable()
+     })
+   }
+
+   async down() {
+     this.schema.alterTable(this.tableName, (table) => {
+       table.dropColumn('category')
+     })
+   }
    ```
 
-2. **Φτιάξε το migration:**
+3. **Εφάρμοσέ το:**
 
    ```bash
-   pnpm --filter api migration:generate src/migrations/AddCategoryToPlaces
+   pnpm --filter api ace migration:run
    ```
 
-3. **Διάβασε το αρχείο που δημιουργήθηκε** στο `src/migrations/`. Βεβαιώσου ότι κάνει μόνο αυτό που περιμένεις, και ότι το `down` αναιρεί σωστά το `up`.
+   Το `database/schema.ts` ενημερώνεται μόνο του, και το `Place` έχει πλέον `category: string | null`.
 
-4. **Εφάρμοσέ το:**
+4. **Έλεγξε** ότι το `migration:rollback` και μετά ξανά το `migration:run` δουλεύουν. Έτσι επιβεβαιώνεις ότι το `down` είναι σωστό.
 
-   ```bash
-   pnpm --filter api migration:run
-   ```
+5. **Πρόσθεσε το πεδίο** όπου χρειάζεται: validator, transformer, tests.
 
-5. **Έλεγξε** ότι το `migration:revert` και μετά ξανά το `migration:run` δουλεύουν. Έτσι επιβεβαιώνεις ότι το `down` είναι σωστό.
+6. **Κάνε commit** το migration **μαζί** με το `database/schema.ts` και τον κώδικα, στο ίδιο commit.
 
-6. **Κάνε commit** το entity **μαζί** με το migration, στο ίδιο commit.
+Χρήσιμες μέθοδοι μέσα στο `createTable` / `alterTable` (είναι του [Knex](https://knexjs.org/guide/schema-builder.html)):
 
-### Ροή: χειροκίνητο migration
-
-Για ό,τι δεν εκφράζεται με entity, φτιάξε άδειο migration και γράψε SQL. Τέτοιες περιπτώσεις είναι extensions, views, triggers, αλλαγές δεδομένων και σύνθετα indexes.
-
-```bash
-pnpm --filter api migration:create src/migrations/EnablePostgis
-```
-
-Παράδειγμα, το [EnablePostgis](../../apps/api/src/migrations/1792053991785-EnablePostgis.ts):
-
-```ts
-export class EnablePostgis1792053991785 implements MigrationInterface {
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('CREATE EXTENSION IF NOT EXISTS postgis');
-  }
-
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP EXTENSION IF EXISTS postgis');
-  }
-}
-```
+| Μέθοδος | Τύπος PostgreSQL |
+| --- | --- |
+| `table.increments('id')` | `serial` primary key |
+| `table.string('name', 200)` | `varchar(200)` |
+| `table.text('notes')` | `text` |
+| `table.integer('count')` | `integer` |
+| `table.boolean('is_active').defaultTo(true)` | `boolean` |
+| `table.timestamp('created_at', { useTz: true })` | `timestamptz` (χρησιμοποίησε πάντα `useTz`) |
+| `table.enu('role', ['admin', 'user'], { useNative: true, enumName: 'user_role' })` | enum |
+| `table.integer('user_id').references('id').inTable('users').onDelete('CASCADE')` | foreign key |
+| `table.specificType('location', 'geometry(Point, 4326)')` | Ό,τι δεν έχει έτοιμη μέθοδο (π.χ. PostGIS) |
+| `this.schema.raw('...')` | Οποιοδήποτε SQL (extensions, indexes, views) |
 
 ### Κανόνες
 
-- **Μην αλλάζεις ποτέ migration που έχει ήδη τρέξει** σε άλλη βάση ή έχει γίνει push. Όποιος το έχει ήδη τρέξει δεν θα πάρει την αλλαγή, γιατί η βάση του το έχει σημειώσει ως εκτελεσμένο. Για διόρθωση φτιάχνεις **νέο** migration.
-  - Εξαίρεση: ένα migration που υπάρχει μόνο στο δικό σου μηχάνημα. Κάνε `migration:revert`, σβήσε το αρχείο, διόρθωσε το entity και ξαναφτιάξ' το.
-- **Ένα migration ανά λογική αλλαγή.** Όχι πολλές άσχετες αλλαγές στο ίδιο αρχείο.
-- **Το `down` πρέπει να δουλεύει.** Αν μια αλλαγή δεν αναιρείται (π.χ. σβήσιμο δεδομένων), γράψε το ρητά σε σχόλιο στο `down`.
-- **Πρόσεχε τις αλλαγές που χάνουν δεδομένα.** Το TypeORM, όταν μετονομάζεις στήλη, κάνει `DROP` και `ADD` και χάνονται τα δεδομένα. Σε μετονομασία, άλλαξε χειροκίνητα το παραγόμενο migration σε `ALTER TABLE ... RENAME COLUMN ...`.
-- **Νέα υποχρεωτική στήλη σε πίνακα με δεδομένα:** δώσε `default`, ή φτιάξ' τη πρώτα `nullable`, γέμισέ τη με δεδομένα, και μετά κάν' τη `NOT NULL` σε επόμενο migration.
-- **Μην κάνεις αλλαγές στο schema με το χέρι** (π.χ. από `psql` ή DBeaver). Θα διαφέρει η βάση σου από τα migrations, και το επόμενο `migration:generate` θα βγάλει περίεργα αποτελέσματα.
+- **Μην αλλάζεις ποτέ migration που έχει ήδη τρέξει** σε άλλη βάση ή έχει γίνει push. Όποιος το έχει ήδη τρέξει δεν θα πάρει την αλλαγή. Για διόρθωση φτιάχνεις **νέο** migration.
+  - Εξαίρεση: ένα migration που υπάρχει μόνο στο δικό σου μηχάνημα. Κάνε `migration:rollback`, διόρθωσέ το, και ξανά `migration:run`.
+- **Ένα migration ανά λογική αλλαγή.**
+- **Το `down` πρέπει να δουλεύει.** Αν κάτι δεν αναιρείται, γράψε το ρητά σε σχόλιο, όπως στο `enable_postgis`.
+- **Μετονομασία στήλης:** `table.renameColumn('old', 'new')`, όχι drop και add, για να μη χαθούν δεδομένα.
+- **Νέα υποχρεωτική στήλη σε πίνακα με δεδομένα:** δώσε `defaultTo(...)`, ή φτιάξ' τη πρώτα `nullable`, γέμισέ τη, και μετά κάν' τη `notNullable` σε επόμενο migration.
+- **Μην κάνεις αλλαγές στο schema με το χέρι** (π.χ. από `psql` ή DBeaver). Το `schema.ts` παράγεται από τη βάση, οπότε θα πάρει τη χειροκίνητη αλλαγή, ενώ οι άλλοι δεν θα την έχουν.
 
 ### Σε production
 
-Τα migrations **δεν** τρέχουν αυτόματα όταν ξεκινάει η εφαρμογή (`migrationsRun` είναι κλειστό). Στο deploy τρέχεις `migration:run` **πριν** ξεκινήσει η νέα έκδοση του api, με τα στοιχεία της production βάσης στο environment:
+Τα migrations δεν τρέχουν αυτόματα. Στο deploy τρέχεις, **πριν** ξεκινήσει η νέα έκδοση, με τα στοιχεία της production βάσης στο environment:
 
 ```bash
-pnpm --filter api migration:run
+node ace migration:run --force
 ```
 
-Έτσι, αν ένα migration αποτύχει, το deploy σταματάει πριν τρέξει κώδικας που περιμένει το νέο schema. Πάρε πάντα backup πριν από migration σε production.
+Το `--force` απαιτείται όταν `NODE_ENV=production`, ως προστασία από κατά λάθος εκτέλεση. Πάρε πάντα backup πριν από migration σε production.
 
 ## Γεωχωρικά δεδομένα (PostGIS)
 
-### Στήλες
+Το Lucid δεν έχει έτοιμο τύπο geometry, οπότε το PostGIS χρησιμοποιείται σε τρία σημεία:
+
+### 1. Στο migration: η στήλη και το index
 
 ```ts
-@Index({ spatial: true })
-@Column({ type: 'geometry', spatialFeatureType: 'Point', srid: 4326 })
-location: Point; // type από το πακέτο 'geojson'
+table.specificType('location', 'geometry(Point, 4326)').notNullable()
+// ...
+this.schema.raw('CREATE INDEX places_location_gist ON places USING gist (location)')
 ```
 
-- **`spatialFeatureType`**: το είδος της γεωμετρίας: `Point`, `LineString`, `Polygon`, `MultiPolygon` κ.λπ. Δήλωνέ το πάντα, ώστε η βάση να απορρίπτει λάθος είδη.
-- **`srid: 4326`**: WGS84, δηλαδή συντεταγμένες GPS σε μοίρες. Χρησιμοποίησε αυτό, εκτός αν υπάρχει λόγος για άλλο σύστημα (π.χ. ΕΓΣΑ87, `2100`).
-- **`@Index({ spatial: true })`**: φτιάχνει GiST index, απαραίτητο για γρήγορα χωρικά queries. Βάλ' το σε κάθε στήλη geometry που χρησιμοποιείται σε αναζητήσεις.
+- **`geometry(Point, 4326)`**: μόνο σημεία, σε **SRID 4326** (WGS84, συντεταγμένες GPS σε μοίρες). Άλλα είδη: `LineString`, `Polygon`, `MultiPolygon`.
+- **GiST index**: απαραίτητο για γρήγορα χωρικά queries. Βάλ' το σε κάθε στήλη geometry που χρησιμοποιείται σε αναζητήσεις.
 
-Το TypeORM διαβάζει και γράφει τις στήλες ως **GeoJSON**:
+### 2. Στο model: η στήλη ως GeoJSON
+
+```ts
+@pointColumn()
+declare location: Point // type από το πακέτο 'geojson'
+```
+
+Το [pointColumn](../../apps/api/app/columns/point.ts) μετατρέπει:
+
+- **κατά την αποθήκευση**, το GeoJSON σε `SRID=4326;POINT(lon lat)`, που το PostGIS δέχεται απευθείας
+- **κατά την ανάγνωση**, τη δυαδική μορφή που επιστρέφει η PostgreSQL (hex EWKB) σε GeoJSON
+
+Η στήλη εξαιρείται από το παραγόμενο schema (`skipColumns` στο `schema_rules.ts`) και δηλώνεται στο model. Έτσι στον κώδικα και στο API βλέπεις πάντα:
 
 ```json
 { "type": "Point", "coordinates": [23.6470, 37.9431] }
@@ -212,25 +217,28 @@ location: Point; // type από το πακέτο 'geojson'
 > [!WARNING]
 > Στο GeoJSON η σειρά είναι **πρώτα longitude, μετά latitude** (`[lon, lat]`). Είναι το πιο συνηθισμένο λάθος: αν τα αντιστρέψεις, ο Πειραιάς βρίσκεται στην Αιθιοπία.
 
-### Χωρικά queries
+Για άλλα είδη γεωμετρίας (π.χ. Polygon για όρια περιοχών), φτιάξε αντίστοιχη στήλη στο `app/columns/`. Για σύνθετες γεωμετρίες, πιο απλό είναι να διαβάζεις με `ST_AsGeoJSON(...)` στο query αντί να αποκωδικοποιείς τη δυαδική μορφή.
 
-Οι συναρτήσεις του PostGIS (`ST_*`) γράφονται σε QueryBuilder. Παράδειγμα από το [places.service.ts](../../apps/api/src/places/places.service.ts): σημεία σε ακτίνα μέτρων, τα πιο κοντινά πρώτα:
+### 3. Στα queries: συναρτήσεις PostGIS
+
+Γράφονται με `whereRaw` / `orderByRaw`, καλύτερα μέσα σε **scope** του model. Παράδειγμα από το [place.ts](../../apps/api/app/models/place.ts):
 
 ```ts
-const point = 'ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography';
-return this.places
-  .createQueryBuilder('place')
-  .where(`ST_DWithin(place.location::geography, ${point}, :radius)`)
-  .orderBy(`ST_Distance(place.location::geography, ${point})`)
-  .setParameters({ lat, lon, radius })
-  .getMany();
+const POINT = 'ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography'
+
+static withinRadius = scope((query, { lat, lon, radius }) => {
+  query
+    .whereRaw(`ST_DWithin(location::geography, ${POINT}, ?)`, [lon, lat, radius])
+    .orderByRaw(`ST_Distance(location::geography, ${POINT})`, [lon, lat])
+})
+
+// χρήση
+await Place.query().withScopes((scopes) => scopes.withinRadius({ lat, lon, radius }))
 ```
 
-- **`::geography`** κάνει τις αποστάσεις σε **μέτρα**. Χωρίς αυτό, σε SRID 4326 οι αποστάσεις είναι σε μοίρες, που δεν σημαίνουν κάτι πρακτικά.
-- **Τιμές πάντα ως parameters** (`:lat`, `:radius`), ποτέ με string concatenation, για προστασία από SQL injection.
-- **`ST_DWithin`** χρησιμοποιεί το spatial index, οπότε είναι γρήγορο. Μην το αντικαθιστάς με `ST_Distance(...) < radius` στο `WHERE`, που δεν χρησιμοποιεί index.
-
-Χρήσιμες συναρτήσεις:
+- **`::geography`** κάνει τις αποστάσεις σε **μέτρα**. Χωρίς αυτό, σε SRID 4326 οι αποστάσεις είναι σε μοίρες.
+- **Τιμές πάντα με `?`** και πίνακα τιμών, ποτέ με string concatenation, για προστασία από SQL injection.
+- **`ST_DWithin`** χρησιμοποιεί το spatial index. Μην το αντικαθιστάς με `ST_Distance(...) < radius` στο `WHERE`, που δεν το χρησιμοποιεί.
 
 | Συνάρτηση | Τι κάνει |
 | --- | --- |
@@ -239,17 +247,20 @@ return this.places
 | `ST_Intersects(a, b)` | Τέμνονται; (π.χ. σημείο μέσα σε πολύγωνο δήμου) |
 | `ST_Contains(a, b)` | Περιέχει το `a` ολόκληρο το `b`; |
 | `ST_MakeEnvelope(xmin, ymin, xmax, ymax, 4326)` | Ορθογώνιο από bounding box (π.χ. η περιοχή που φαίνεται στον χάρτη) |
-| `ST_Transform(geom, srid)` | Μετατροπή σε άλλο σύστημα συντεταγμένων |
-| `ST_AsGeoJSON(geom)` | Γεωμετρία σε GeoJSON (σε raw queries) |
+| `ST_Transform(geom, srid)` | Μετατροπή σε άλλο σύστημα συντεταγμένων (π.χ. `2100` για ΕΓΣΑ87) |
+| `ST_AsGeoJSON(geom)` | Γεωμετρία σε GeoJSON |
 
 ## Το τρέχον schema
 
-| Πίνακας | Από | Τι κρατάει |
+| Πίνακας | Migration | Τι κρατάει |
 | --- | --- | --- |
-| `places` | [CreatePlaces](../../apps/api/src/migrations/1792054036084-CreatePlaces.ts) | Σημεία με όνομα και θέση (`geometry(Point, 4326)`, GiST index) |
-| `migrations` | TypeORM | Ποια migrations έχουν τρέξει. Μην το αλλάζεις με το χέρι |
+| `users` | [create_users_table](../../apps/api/database/migrations/1761885935168_create_users_table.ts) | Χρήστες: email (μοναδικό, πεζά), hash κωδικού (scrypt), ρόλος (`user_role`: `admin` / `user`), ενεργός ή όχι |
+| `auth_access_tokens` | [create_access_tokens_table](../../apps/api/database/migrations/1768620764696_create_access_tokens_table.ts) | Τα access tokens (μόνο το hash τους), με λήξη. Σβήνονται μαζί με τον χρήστη. Βλ. [AUTH.md](AUTH.md) |
+| `places` | [create_places_table](../../apps/api/database/migrations/1768620764700_create_places_table.ts) | Σημεία: όνομα, θέση (`geometry(Point, 4326)`, GiST index), ιδιοκτήτης (`created_by_id` → `users`, γίνεται `NULL` αν σβηστεί ο χρήστης) |
+| `adonis_schema`, `adonis_schema_versions` | Lucid | Ποια migrations έχουν τρέξει. Μην τα αλλάζεις με το χέρι |
+| `spatial_ref_sys` | PostGIS | Τα συστήματα συντεταγμένων. Μην τον αλλάζεις |
 
-Extensions: `postgis` (από το migration [EnablePostgis](../../apps/api/src/migrations/1792053991785-EnablePostgis.ts)).
+Extensions: `postgis` (από το migration [enable_postgis](../../apps/api/database/migrations/1761885935000_enable_postgis.ts)). Το docker image προσθέτει επίσης `postgis_topology`, `postgis_tiger_geocoder` και `fuzzystrmatch`. Γι' αυτό το `down` του `enable_postgis` δεν σβήνει το PostGIS: τα άλλα extensions εξαρτώνται από αυτό.
 
 Ενημέρωνε αυτόν τον πίνακα όταν προσθέτεις πίνακα.
 
@@ -257,20 +268,18 @@ Extensions: `postgis` (από το migration [EnablePostgis](../../apps/api/src/
 
 | Μήνυμα | Αιτία και λύση |
 | --- | --- |
+| `addQueryContext is not a function` | Παλιό Node (24.0.0). Αναβάθμισε σε Node 24.22 ή νεότερο (`nvm install 24`) |
 | `ECONNREFUSED` ή `connect ... 5432` | Δεν τρέχει η βάση, ή το `DB_PORT` δεν ταιριάζει με το `POSTGRES_PORT`. Τρέξε `docker compose up -d postgres` και έλεγξε τα δύο `.env` |
 | `password authentication failed` | Λάθος `DB_USER` ή `DB_PASSWORD`. Αν άλλαξες τον κωδικό στο root `.env` **αφού** είχε δημιουργηθεί η βάση, δεν εφαρμόζεται: ο κωδικός ορίζεται μόνο την πρώτη φορά |
-| `No changes in database schema were found` | Τα entities συμφωνούν ήδη με τη βάση. Αν περίμενες αλλαγές, έλεγξε ότι το entity είναι στη λίστα `entities` του `database.config.ts` |
-| `relation "..." already exists` | Ο πίνακας φτιάχτηκε εκτός migrations (π.χ. με το χέρι). Σε τοπική βάση, σβήσε τον πίνακα ή κάνε reset (παρακάτω) |
-| `type "geometry" does not exist` | Δεν έχει τρέξει το `EnablePostgis`. Τρέξε `migration:run` |
-| `Unable to open file: dist/data-source.js` | Απέτυχε το `nest build`. Διόρθωσε τα σφάλματα TypeScript που εμφανίζει πρώτα |
+| `type "user_role" already exists` | Το `migration:fresh` χωρίς `--drop-types`. Ξανατρέξ' το με `--drop-types` |
+| `type "geometry" does not exist` | Δεν έχει τρέξει το `enable_postgis`. Τρέξε `migration:run` |
+| `Cannot define "x" on "Y" model, since it is not defined as a model property` | Η στήλη λείπει από το `database/schema.ts`. Τρέξε `migration:run` ή `ace schema:generate`, και έλεγξε το `schema_rules.ts` |
 
 ### Reset τοπικής βάσης
 
-Σβήνει **όλα** τα δεδομένα της τοπικής βάσης και την ξαναφτιάχνει από τα migrations. Δεν επηρεάζει Nominatim και Photon.
+Σβήνει **όλα** τα δεδομένα της εφαρμογής και ξαναφτιάχνει τους πίνακες από τα migrations. Δεν επηρεάζει Nominatim και Photon.
 
 ```bash
-docker compose down postgres
-docker volume rm geoplatform_postgres-data
-docker compose up -d postgres
-pnpm --filter api migration:run
+pnpm --filter api ace migration:fresh --drop-types
+pnpm --filter api ace create:admin <email>
 ```

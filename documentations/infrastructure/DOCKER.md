@@ -55,7 +55,7 @@ curl "http://localhost:8080/search?q=Πειραιάς&format=json"   # Nominatim
 curl "http://localhost:2322/api?q=Πειραιά&lang=el"           # Photon
 ```
 
-Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplatform` και `redis://localhost:6379`. Το api συνδέεται με τη βάση μέσω του `apps/api/.env` (βλ. [DB.md](../backend/DB.md#σύνδεση)).
+Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplatform` και `redis://localhost:6379`. Το api συνδέεται με τη βάση και το Redis μέσω του `apps/api/.env` (βλ. [DB.md](../backend/DB.md#σύνδεση) και [API.md](../backend/API.md#ρυθμίσεις-env)). Το Redis το χρησιμοποιεί προς το παρόν για τα όρια requests στο login.
 
 ## Nominatim και Photon: πότε ποιο
 
@@ -83,7 +83,7 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 | `PHOTON_LANGUAGES`                    | `el,en`                           | Γλώσσες στο index του Photon                                  |
 | `PHOTON_PORT`                         | `2322`                            | Port στο host                                                 |
 
-**Port πιασμένο** (π.χ. από άλλο project): άλλαξέ το στο `.env`, π.χ. `POSTGRES_PORT=5434`. Αν αλλάξεις το `POSTGRES_PORT`, άλλαξε και το `DB_PORT` στο `apps/api/.env`.
+**Port πιασμένο** (π.χ. από άλλο project): άλλαξέ το στο `.env`, π.χ. `POSTGRES_PORT=5434`. Αν αλλάξεις το `POSTGRES_PORT` ή το `REDIS_PORT`, άλλαξε αντίστοιχα και τα `DB_PORT` και `REDIS_PORT` στο `apps/api/.env`.
 
 **Κωδικοί:** οι κωδικοί της βάσης ορίζονται μόνο όταν δημιουργείται το volume. Αν τους αλλάξεις αργότερα στο `.env`, δεν εφαρμόζονται. Πρέπει να σβήσεις το volume (βλ. παρακάτω).
 
@@ -105,8 +105,8 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 
 | Volume | Τι κρατάει | Αν το σβήσεις |
 | --- | --- | --- |
-| `geoplatform_postgres-data` | Η βάση της εφαρμογής | Χάνονται όλα τα δεδομένα. Ξανατρέχεις `migration:run` (βλ. [DB.md](../backend/DB.md#reset-τοπικής-βάσης)) |
-| `geoplatform_redis-data` | Τα δεδομένα του Redis | Χάνονται cache και queues |
+| `geoplatform_postgres-data` | Η βάση της εφαρμογής | Χάνονται όλα τα δεδομένα. Ξανατρέχεις `ace migration:run` και `ace create:admin` (βλ. [DB.md](../backend/DB.md#reset-τοπικής-βάσης)) |
+| `geoplatform_redis-data` | Τα δεδομένα του Redis | Μηδενίζονται τα όρια requests |
 | `geoplatform_nominatim-data` | Η βάση του Nominatim | Ξανά import (~15–30 λεπτά) |
 | `geoplatform_photon-data` | Το index του Photon | Ξανά index από το Nominatim (~4 λεπτά) |
 

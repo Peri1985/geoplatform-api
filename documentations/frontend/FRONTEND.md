@@ -24,14 +24,14 @@ pnpm turbo dev --filter admin...   # το admin μαζί με ό,τι χρειά
 
 ## Κλήσεις στο API
 
-Και τα δύο apps προωθούν (proxy) το `/api` στο api (`http://localhost:3000`). Η ρύθμιση είναι στο `vite.config.ts`:
+Και τα δύο apps προωθούν (proxy) το `/api` στο api (`http://localhost:3333`). Η ρύθμιση είναι στο `vite.config.ts`:
 
 ```ts
 server: {
   port: 5173,
   strictPort: true,
   proxy: {
-    '/api': 'http://localhost:3000',
+    '/api': 'http://localhost:3333',
   },
 },
 ```
@@ -41,10 +41,21 @@ server: {
 ```ts
 import { HealthSchema } from '@repo/shared';
 
-const health = HealthSchema.parse(await fetch('/api/health').then((r) => r.json()));
+const health = HealthSchema.parse(await fetch('/api/v1/health').then((r) => r.json()));
 ```
 
-Τα schemas και οι types των δεδομένων έρχονται από το `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)). Έτσι, αν αλλάξει κάτι στο API, το TypeScript το δείχνει και στα frontends.
+Εκτός από τα δημόσια endpoints (health, signup, login), κάθε κλήση θέλει το header `Authorization: Bearer <token>`. Το token το δίνει το login. Το πώς το κρατάει ο client και τι κάνει σε `401` περιγράφεται στο [AUTH.md](../backend/AUTH.md#ροή-για-έναν-client). Οι σελίδες login στα `admin` και `account` δεν έχουν φτιαχτεί ακόμα.
+
+Οι απαντήσεις του api είναι τυλιγμένες σε `data`, και τα σφάλματα σε `errors` (βλ. [API.md](../backend/API.md#μορφή-απαντήσεων)):
+
+```ts
+const response = await fetch('/api/v1/places', {
+  headers: { Authorization: `Bearer ${token}` },
+});
+const { data: places } = await response.json();
+```
+
+Τα schemas και οι types των δεδομένων έρχονται από το `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)).
 
 Το `strictPort` κάνει τον dev server να σταματάει με σφάλμα αν το port είναι πιασμένο, αντί να πάει σε άλλο. Έτσι το URL κάθε app μένει πάντα ίδιο.
 
@@ -154,4 +165,4 @@ import { Button } from '@repo/ui'
 ## Κανόνες
 
 - Τα imports στα React apps και στο `ui` **δεν** θέλουν κατάληξη `.js` (bundler resolution), σε αντίθεση με το api και το shared.
-- Μην γράφεις URLs του api στον κώδικα (`http://localhost:3000/...`). Χρησιμοποίησε πάντα `/api/...` μέσω του proxy.
+- Μην γράφεις URLs του api στον κώδικα (`http://localhost:3333/...`). Χρησιμοποίησε πάντα `/api/v1/...` μέσω του proxy.
