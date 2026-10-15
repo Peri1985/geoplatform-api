@@ -12,7 +12,8 @@
 | Αρχείο | Schemas | Types |
 | --- | --- | --- |
 | [index.ts](../../packages/shared/src/index.ts) | `HealthSchema` | `Health` |
-| [place.ts](../../packages/shared/src/place.ts) | `PointSchema`, `PlaceSchema`, `CreatePlaceSchema`, `NearbyQuerySchema` | `Point`, `Place`, `CreatePlace`, `NearbyQuery` |
+| [place.ts](../../packages/shared/src/place.ts) | `PointSchema`, `PlaceSchema`, `CreatePlaceSchema`, `UpdatePlaceSchema`, `NearbyQuerySchema` | `Point`, `Place`, `CreatePlace`, `UpdatePlace`, `NearbyQuery` |
+| [auth.ts](../../packages/shared/src/auth.ts) | `RoleSchema`, `UserSchema`, `RegisterSchema`, `LoginSchema`, `RefreshTokenSchema`, `TokensSchema`, `UpdateUserSchema` | `Role`, `User`, `Register`, `Login`, `RefreshToken`, `Tokens`, `UpdateUser` |
 
 ## Χρήση
 
@@ -47,7 +48,10 @@ if (!result.success) {
 
 const place: Place = await fetch('/api/places', {
   method: 'POST',
-  headers: { 'content-type': 'application/json' },
+  headers: {
+    'content-type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  },
   body: JSON.stringify(result.data),
 }).then((r) => r.json());
 ```

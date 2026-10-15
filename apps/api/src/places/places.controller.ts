@@ -1,10 +1,25 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   type CreatePlace,
   CreatePlaceSchema,
   type NearbyQuery,
   NearbyQuerySchema,
+  type UpdatePlace,
+  UpdatePlaceSchema,
 } from '@repo/shared';
+import type { AuthUser } from '../auth/auth-user.js';
+import { CurrentUser } from '../auth/decorators.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { Place } from './place.entity.js';
 import { PlacesService } from './places.service.js';
@@ -29,7 +44,26 @@ export class PlacesController {
   @Post()
   create(
     @Body(new ZodValidationPipe(CreatePlaceSchema)) body: CreatePlace,
+    @CurrentUser() user: AuthUser,
   ): Promise<Place> {
-    return this.placesService.create(body);
+    return this.placesService.create(body, user);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(UpdatePlaceSchema)) body: UpdatePlace,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Place> {
+    return this.placesService.update(id, body, user);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<void> {
+    return this.placesService.remove(id, user);
   }
 }

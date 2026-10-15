@@ -246,10 +246,12 @@ return this.places
 
 | Πίνακας | Από | Τι κρατάει |
 | --- | --- | --- |
-| `places` | [CreatePlaces](../../apps/api/src/migrations/1792054036084-CreatePlaces.ts) | Σημεία με όνομα και θέση (`geometry(Point, 4326)`, GiST index) |
+| `users` | [AddUsersAndRefreshTokens](../../apps/api/src/migrations/1792060988081-AddUsersAndRefreshTokens.ts) | Χρήστες: email (μοναδικό, πεζά), hash κωδικού (argon2id), ρόλος (`user_role`: `admin` / `user`), ενεργός ή όχι |
+| `refresh_tokens` | [AddUsersAndRefreshTokens](../../apps/api/src/migrations/1792060988081-AddUsersAndRefreshTokens.ts) | Refresh tokens ως SHA-256 hash, με λήξη και ακύρωση. Σβήνονται μαζί με τον χρήστη (`ON DELETE CASCADE`). Βλ. [AUTH.md](AUTH.md) |
+| `places` | [CreatePlaces](../../apps/api/src/migrations/1792054036084-CreatePlaces.ts), `createdById` από το [AddUsersAndRefreshTokens](../../apps/api/src/migrations/1792060988081-AddUsersAndRefreshTokens.ts) | Σημεία με όνομα, θέση (`geometry(Point, 4326)`, GiST index) και ιδιοκτήτη (`createdById` → `users`, `ON DELETE SET NULL`) |
 | `migrations` | TypeORM | Ποια migrations έχουν τρέξει. Μην το αλλάζεις με το χέρι |
 
-Extensions: `postgis` (από το migration [EnablePostgis](../../apps/api/src/migrations/1792053991785-EnablePostgis.ts)).
+Extensions: `postgis` (από το migration [EnablePostgis](../../apps/api/src/migrations/1792053991785-EnablePostgis.ts)). Τύποι: `user_role` (enum).
 
 Ενημέρωνε αυτόν τον πίνακα όταν προσθέτεις πίνακα.
 

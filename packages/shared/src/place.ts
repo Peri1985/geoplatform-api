@@ -11,6 +11,8 @@ export const PlaceSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   location: PointSchema,
+  // null when the user who created it was deleted
+  createdById: z.uuid().nullable(),
   createdAt: z.coerce.date(),
 });
 export type Place = z.infer<typeof PlaceSchema>;
@@ -20,6 +22,9 @@ export const CreatePlaceSchema = z.object({
   location: PointSchema,
 });
 export type CreatePlace = z.infer<typeof CreatePlaceSchema>;
+
+export const UpdatePlaceSchema = CreatePlaceSchema.partial();
+export type UpdatePlace = z.infer<typeof UpdatePlaceSchema>;
 
 export const NearbyQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),

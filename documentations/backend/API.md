@@ -2,7 +2,10 @@
 
 Το backend είναι εφαρμογή [NestJS](https://nestjs.com) 12 στο `apps/api`. Είναι γραμμένο σε TypeScript 6 ως ESM (`"type": "module"`), και όλα τα routes είναι κάτω από το `/api`.
 
-Για τη βάση και τα migrations δες το [DB.md](DB.md).
+Για τη βάση και τα migrations δες το [DB.md](DB.md). Για login, tokens και δικαιώματα δες το [AUTH.md](AUTH.md).
+
+> [!IMPORTANT]
+> Όλα τα endpoints θέλουν `Authorization: Bearer <accessToken>`, εκτός από όσα έχουν `@Public()`. Χωρίς token επιστρέφουν `401`.
 
 ## Περιεχόμενα
 
@@ -49,11 +52,15 @@ apps/api/
 │   ├── app.module.ts       # root module: config, βάση, όλα τα modules
 │   ├── app.controller.ts   # /api και /api/health
 │   ├── data-source.ts      # για το TypeORM CLI (migrations)
-│   ├── common/             # κοινά κομμάτια (pipes, guards, filters)
+│   ├── auth/               # login, tokens, guards, decorators (βλ. AUTH.md)
+│   ├── cli/                # εντολές γραμμής (create-admin)
+│   ├── common/             # κοινά κομμάτια (pipes, filters)
 │   │   └── zod-validation.pipe.ts
+│   ├── config/             # ανάγνωση και έλεγχος του .env
 │   ├── database/
 │   │   └── database.config.ts
 │   ├── migrations/         # migrations της βάσης
+│   ├── users/              # χρήστες και διαχείρισή τους (admin)
 │   └── places/             # ένα module ανά λειτουργία
 │       ├── place.entity.ts
 │       ├── places.controller.ts
@@ -79,6 +86,8 @@ apps/api/
 | --- | --- | --- |
 | `PORT` | `3000` | Port του api |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | βλ. [DB.md](DB.md#σύνδεση) | Σύνδεση με τη βάση |
+| `JWT_SECRET` | — (υποχρεωτικό) | Υπογραφή των access tokens, βλ. [AUTH.md](AUTH.md#ρυθμίσεις-env) |
+| `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL_DAYS` | `900`, `30` | Διάρκεια των tokens |
 
 Νέα μεταβλητή: πρόσθεσέ τη **και** στο `.env.example`, με τιμή που δουλεύει τοπικά ή με σχόλιο για το τι βάζεις.
 
@@ -86,22 +95,30 @@ apps/api/
 
 ## Endpoints
 
-| Method | Path | Τι κάνει |
-| --- | --- | --- |
-| `GET` | `/api` | `Hello World!` |
-| `GET` | `/api/health` | `{ "status": "ok" }`, για έλεγχο ότι τρέχει |
-| `GET` | `/api/places` | Όλα τα σημεία, νεότερα πρώτα |
-| `POST` | `/api/places` | Νέο σημείο |
-| `GET` | `/api/places/nearby?lat=&lon=&radius=` | Σημεία σε ακτίνα `radius` μέτρων (default 1000, max 100000), πιο κοντινά πρώτα |
+| Method | Path | Ποιος | Τι κάνει |
+| --- | --- | --- | --- |
+| `GET` | `/api` | Δημόσιο | `Hello World!` |
+| `GET` | `/api/health` | Δημόσιο | `{ "status": "ok" }`, για έλεγχο ότι τρέχει |
+| `POST` | `/api/auth/register`, `login`, `refresh`, `logout` | Δημόσιο | Βλ. [AUTH.md](AUTH.md#endpoints) |
+| `GET` | `/api/auth/me` | Συνδεδεμένοι | Ο συνδεδεμένος χρήστης |
+| `GET` | `/api/places` | Συνδεδεμένοι | Όλα τα σημεία, νεότερα πρώτα |
+| `POST` | `/api/places` | Συνδεδεμένοι | Νέο σημείο, με ιδιοκτήτη τον χρήστη |
+| `GET` | `/api/places/nearby?lat=&lon=&radius=` | Συνδεδεμένοι | Σημεία σε ακτίνα `radius` μέτρων (default 1000, max 100000), πιο κοντινά πρώτα |
+| `PATCH` | `/api/places/:id` | Ιδιοκτήτης ή admin | Αλλαγή ονόματος ή θέσης |
+| `DELETE` | `/api/places/:id` | Ιδιοκτήτης ή admin | Διαγραφή (`204`) |
+| `GET` | `/api/users` | Admin | Όλοι οι χρήστες |
+| `PATCH` | `/api/users/:id` | Admin | Αλλαγή ρόλου ή απενεργοποίηση |
 
-Παραδείγματα:
+Παραδείγματα (το `$TOKEN` είναι το `accessToken` από το `/api/auth/login`):
 
 ```bash
 curl -X POST http://localhost:3000/api/places \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{"name":"Λιμάνι Πειραιά","location":{"type":"Point","coordinates":[23.64,37.942]}}'
 
-curl "http://localhost:3000/api/places/nearby?lat=37.943&lon=23.647&radius=2000"
+curl "http://localhost:3000/api/places/nearby?lat=37.943&lon=23.647&radius=2000" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 Οι θέσεις είναι GeoJSON με σειρά `[longitude, latitude]` (βλ. [DB.md](DB.md#γεωχωρικά-δεδομένα-postgis)).
@@ -154,6 +171,8 @@ curl "http://localhost:3000/api/places/nearby?lat=37.943&lon=23.647&radius=2000"
 
 6. **Δήλωσέ το** στα `imports` του `app.module.ts`.
 
+   Τα endpoints του είναι αυτόματα **κλειστά**: θέλουν token. Χρησιμοποίησε `@Public()` μόνο για όσα πρέπει να είναι ανοιχτά, `@Roles('admin')` για όσα είναι μόνο για admin, και `@CurrentUser()` για τον χρήστη του request (βλ. [AUTH.md](AUTH.md#προστασία-endpoints-στον-κώδικα)).
+
 7. **Migration** για τον νέο πίνακα (βλ. [DB.md](DB.md#ροή-αλλαγή-στο-schema)):
 
    ```bash
@@ -203,7 +222,7 @@ findNearby(@Query(new ZodValidationPipe(NearbyQuerySchema)) query: NearbyQuery):
 
 Και τα δύο τρέχουν με [vitest](https://vitest.dev). Το `pnpm test` από το root τρέχει μόνο τα unit tests όλων των πακέτων.
 
-Τα e2e tests χρησιμοποιούν την ίδια βάση με το development (`apps/api/.env`). Αν ένα test γράφει δεδομένα, πρέπει να τα σβήνει στο τέλος.
+Τα e2e tests χρησιμοποιούν την ίδια βάση με το development (`apps/api/.env`). Αν ένα test γράφει δεδομένα, πρέπει να τα σβήνει στο τέλος. Παράδειγμα είναι το [auth.e2e-spec.ts](../../apps/api/test/auth.e2e-spec.ts): οι χρήστες που φτιάχνει έχουν email `e2e-*@test.local` και σβήνονται στο `afterAll`. Το ίδιο αρχείο δείχνει και πώς κάνεις login σε ένα test και στέλνεις το token.
 
 ## Κανόνες κώδικα
 

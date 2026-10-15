@@ -44,6 +44,14 @@ import { HealthSchema } from '@repo/shared';
 const health = HealthSchema.parse(await fetch('/api/health').then((r) => r.json()));
 ```
 
+Εκτός από τα δημόσια endpoints (π.χ. `/api/health`), κάθε κλήση θέλει το header `Authorization: Bearer <accessToken>`. Το πώς κάνει ο client login, πού κρατάει τα tokens και πότε κάνει refresh περιγράφεται στο [AUTH.md](../backend/AUTH.md#ροή-για-έναν-client). Οι σελίδες login στα `admin` και `account` δεν έχουν φτιαχτεί ακόμα.
+
+```ts
+const places = await fetch('/api/places', {
+  headers: { Authorization: `Bearer ${accessToken}` },
+}).then((r) => r.json());
+```
+
 Τα schemas και οι types των δεδομένων έρχονται από το `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)). Έτσι, αν αλλάξει κάτι στο API, το TypeScript το δείχνει και στα frontends.
 
 Το `strictPort` κάνει τον dev server να σταματάει με σφάλμα αν το port είναι πιασμένο, αντί να πάει σε άλλο. Έτσι το URL κάθε app μένει πάντα ίδιο.

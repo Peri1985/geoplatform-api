@@ -1,5 +1,7 @@
 import type { DataSourceOptions } from 'typeorm';
+import { RefreshToken } from '../auth/refresh-token.entity.js';
 import { Place } from '../places/place.entity.js';
+import { User } from '../users/user.entity.js';
 
 // Shared by the Nest app (app.module.ts) and the TypeORM CLI (data-source.ts).
 export function databaseOptions(): DataSourceOptions {
@@ -12,7 +14,7 @@ export function databaseOptions(): DataSourceOptions {
     database: process.env.DB_NAME ?? 'geoplatform',
     // gen_random_uuid() is built into Postgres 13+, no uuid-ossp extension needed
     uuidExtension: 'pgcrypto',
-    entities: [Place],
+    entities: [User, RefreshToken, Place],
     // Compiled migrations; the CLI and the app both run from dist/
     migrations: [new URL('../migrations/*.js', import.meta.url).pathname],
     // The schema changes only through migrations

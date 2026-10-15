@@ -33,10 +33,11 @@ Monorepo με pnpm workspaces και Turborepo: ένα backend σε NestJS, δύ
 
 ```bash
 cp .env.example .env                    # ρυθμίσεις του Docker
-cp apps/api/.env.example apps/api/.env  # σύνδεση του api με τη βάση
+cp apps/api/.env.example apps/api/.env  # σύνδεση με τη βάση, και βάλε JWT_SECRET (openssl rand -base64 48)
 docker compose up -d                    # PostGIS, Redis, Nominatim, Photon
 pnpm install
 pnpm --filter api migration:run         # δημιουργεί τους πίνακες της βάσης
+pnpm --filter api create-admin <email>  # ο πρώτος admin (τυπώνει τον κωδικό μία φορά)
 pnpm dev                                # api, admin, account και shared (watch)
 ```
 
@@ -54,6 +55,7 @@ pnpm dev                                # api, admin, account και shared (wat
 | --- | --- |
 | Backend: δομή, modules, endpoints, validation, tests | [documentations/backend/API.md](documentations/backend/API.md) |
 | Βάση δεδομένων: TypeORM, entities, **migrations**, PostGIS | [documentations/backend/DB.md](documentations/backend/DB.md) |
+| Authentication και authorization: Bearer tokens, ρόλοι, ιδιοκτησία | [documentations/backend/AUTH.md](documentations/backend/AUTH.md) |
 | Frontends: admin, account, κλήσεις στο API, κοινά React components | [documentations/frontend/FRONTEND.md](documentations/frontend/FRONTEND.md) |
 | Κοινό πακέτο `@repo/shared`: Zod schemas και types | [documentations/shared/SHARED.md](documentations/shared/SHARED.md) |
 | Docker: PostGIS, Redis, Nominatim, Photon | [documentations/infrastructure/DOCKER.md](documentations/infrastructure/DOCKER.md) |
