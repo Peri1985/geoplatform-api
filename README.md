@@ -57,6 +57,7 @@ npm run dev                                       # api, admin, account και s
 | Backend: δομή, endpoints, νέα λειτουργία, validation, tests | [documentations/backend/API.md](documentations/backend/API.md) |
 | Βάση δεδομένων: Lucid, models, **migrations**, PostGIS | [documentations/backend/DB.md](documentations/backend/DB.md) |
 | Authentication: Bearer tokens, signup, login | [documentations/backend/AUTH.md](documentations/backend/AUTH.md) |
+| Audit log: ποιος έκανε τι, πότε, από πού | [documentations/backend/AUDIT.md](documentations/backend/AUDIT.md) |
 | Frontends: admin, account, κλήσεις στο API, κοινά React components | [documentations/frontend/FRONTEND.md](documentations/frontend/FRONTEND.md) |
 | Κοινό πακέτο `@repo/shared`: Zod schemas και types | [documentations/shared/SHARED.md](documentations/shared/SHARED.md) |
 | Docker: PostGIS, Redis, RustFS, Nominatim, Photon | [documentations/infrastructure/DOCKER.md](documentations/infrastructure/DOCKER.md) |

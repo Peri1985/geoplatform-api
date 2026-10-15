@@ -267,6 +267,11 @@ static withinRadius = scope((query, { lat, lon, radius }: { lat: number; lon: nu
 | `users` | [create_users_table](../../apps/api/database/migrations/1761885935168_create_users_table.ts) | Χρήστες: όνομα, email (μοναδικό, πεζά), hash κωδικού (scrypt) |
 | `files` | [create_files_table](../../apps/api/database/migrations/1792070000000_create_files_table.ts) | Τα αρχεία στο S3: key, όνομα, τύπος, μέγεθος, ιδιοκτήτης (`owner_id` → `users`, `CASCADE`), και πολυμορφική σύνδεση (`attachable_type`, `attachable_id`, χωρίς foreign key). Βλ. [STORAGE.md](../infrastructure/STORAGE.md#ο-πίνακας-files-πολυμορφικός) |
 | `auth_access_tokens` | [create_access_tokens_table](../../apps/api/database/migrations/1768620764696_create_access_tokens_table.ts) | Τα access tokens (μόνο το hash τους), με λήξη. Σβήνονται μαζί με τον χρήστη. Βλ. [AUTH.md](AUTH.md) |
+| `groups` | [create_groups_table](../../apps/api/database/migrations/1792070855669_create_groups_table.ts) | Ομάδες χρηστών. `name` υποχρεωτικό, όχι μοναδικό (δύο ομάδες μπορούν να έχουν το ίδιο όνομα). Model: `Group` |
+| `group_user` | [create_group_user_table](../../apps/api/database/migrations/1792070866118_create_group_user_table.ts) | Pivot: ποιος χρήστης ανήκει σε ποια ομάδα. Μοναδικό ζευγάρι, σβήνεται μαζί με τον χρήστη ή την ομάδα. Σχέση `user.groups` / `group.users` |
+| `roles` | [create_roles_table](../../apps/api/database/migrations/1792071093467_create_roles_table.ts) | Ρόλοι: `name`, `sector` και `role`, όλα υποχρεωτικά. Model: `Role` |
+| `role_user` | [create_role_user_table](../../apps/api/database/migrations/1792071103231_create_role_user_table.ts) | Pivot: ποιος χρήστης έχει ποιον ρόλο. Μοναδικό ζευγάρι, σβήνεται μαζί με τον χρήστη ή τον ρόλο. Σχέση `user.roles` / `role.users` |
+| `audit_logs` | [create_audit_logs_table](../../apps/api/database/migrations/1792080000000_create_audit_logs_table.ts) | Ποιος έκανε τι, σε ποια εγγραφή, πότε και από πού. Μόνο προσθήκες (trigger `audit_logs_no_update`). Βλ. [AUDIT.md](AUDIT.md) |
 | `adonis_schema`, `adonis_schema_versions` | Lucid | Ποια migrations έχουν τρέξει. Μην τα αλλάζεις με το χέρι |
 | `spatial_ref_sys` | PostGIS | Τα συστήματα συντεταγμένων. Μην τον αλλάζεις |
 

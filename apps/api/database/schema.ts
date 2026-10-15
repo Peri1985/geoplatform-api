@@ -7,19 +7,33 @@
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
 
+export class AuditLogSchema extends BaseModel {
+  static $columns = ['action', 'changes', 'createdAt', 'id', 'ip', 'requestId', 'subjectId', 'subjectType', 'userAgent', 'userId'] as const
+  $columns = AuditLogSchema.$columns
+  @column()
+  declare action: string
+  @column()
+  declare changes: Record<string, unknown> | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare ip: string | null
+  @column()
+  declare requestId: string | null
+  @column()
+  declare subjectId: string | null
+  @column()
+  declare subjectType: string | null
+  @column()
+  declare userAgent: string | null
+  @column()
+  declare userId: string | null
+}
+
 export class AuthAccessTokenSchema extends BaseModel {
-  static $columns = [
-    'abilities',
-    'createdAt',
-    'expiresAt',
-    'hash',
-    'id',
-    'lastUsedAt',
-    'name',
-    'tokenableId',
-    'type',
-    'updatedAt',
-  ] as const
+  static $columns = ['abilities', 'createdAt', 'expiresAt', 'hash', 'id', 'lastUsedAt', 'name', 'tokenableId', 'type', 'updatedAt'] as const
   $columns = AuthAccessTokenSchema.$columns
   @column()
   declare abilities: string
@@ -44,18 +58,7 @@ export class AuthAccessTokenSchema extends BaseModel {
 }
 
 export class FileSchema extends BaseModel {
-  static $columns = [
-    'attachableId',
-    'attachableType',
-    'createdAt',
-    'id',
-    'key',
-    'mimeType',
-    'name',
-    'ownerId',
-    'size',
-    'updatedAt',
-  ] as const
+  static $columns = ['attachableId', 'attachableType', 'createdAt', 'id', 'key', 'mimeType', 'name', 'ownerId', 'size', 'updatedAt'] as const
   $columns = FileSchema.$columns
   @column()
   declare attachableId: string | null
@@ -77,6 +80,50 @@ export class FileSchema extends BaseModel {
   declare size: number
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+}
+
+export class GroupUserSchema extends BaseModel {
+  static $columns = ['groupId', 'userId'] as const
+  $columns = GroupUserSchema.$columns
+  @column()
+  declare groupId: string
+  @column()
+  declare userId: string
+}
+
+export class GroupSchema extends BaseModel {
+  static $columns = ['createdAt', 'id', 'name', 'updatedAt'] as const
+  $columns = GroupSchema.$columns
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare name: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+}
+
+export class RoleUserSchema extends BaseModel {
+  static $columns = ['roleId', 'userId'] as const
+  $columns = RoleUserSchema.$columns
+  @column()
+  declare roleId: string
+  @column()
+  declare userId: string
+}
+
+export class RoleSchema extends BaseModel {
+  static $columns = ['id', 'name', 'role', 'sector'] as const
+  $columns = RoleSchema.$columns
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare name: string
+  @column()
+  declare role: string
+  @column()
+  declare sector: string
 }
 
 export class SpatialRefSySchema extends BaseModel {

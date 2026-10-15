@@ -5,6 +5,7 @@
 - Βάση και migrations: [DB.md](DB.md)
 - Login και tokens: [AUTH.md](AUTH.md)
 - Αρχεία (S3): [STORAGE.md](../infrastructure/STORAGE.md)
+- Audit log: [AUDIT.md](AUDIT.md)
 
 > [!IMPORTANT]
 > Χρειάζεται **Node 24.22 ή νεότερο** (`.nvmrc` στο root). Με το Node 24.0.0 το Adonis σκάει με `addQueryContext is not a function` μόλις ανοίξει σύνδεση με τη βάση.
@@ -58,9 +59,12 @@ apps/api/
 │   ├── controllers/        # HTTP handlers, ένας ανά πόρο (auth, profile, files, health)
 │   ├── exceptions/         # μετατροπή σφαλμάτων σε απαντήσεις
 │   ├── middleware/         # auth, JSON
-│   ├── models/             # Lucid models (user, file)
+│   ├── mixins/             # withAudit(): audit log για models
+│   ├── models/             # Lucid models (user, file, audit_log)
+│   ├── services/           # audit(): εγγραφή στο audit log, καθαρισμός
 │   ├── transformers/       # τι επιστρέφεται από κάθε model
 │   └── validators/         # VineJS: έλεγχος body και query
+├── commands/               # εντολές ace (audit:prune)
 ├── config/                 # ρυθμίσεις: auth, database, drive (S3), redis, limiter, cors...
 ├── database/
 │   ├── migrations/         # migrations της βάσης
@@ -69,6 +73,7 @@ apps/api/
 ├── providers/              # το api_provider τυλίγει τις απαντήσεις σε { data }
 ├── start/
 │   ├── env.ts              # έλεγχος των μεταβλητών του .env
+│   ├── audit.ts            # αυτόματος καθαρισμός του audit log (μία φορά τη μέρα)
 │   ├── kernel.ts           # middleware
 │   ├── limiter.ts          # όρια requests
 │   └── routes.ts           # όλα τα routes
@@ -101,6 +106,7 @@ apps/api/
 | `LIMITER_STORE` | `redis` | Πού κρατιούνται τα όρια requests (`redis` ή `memory`) |
 | `DRIVE_DISK`, `AWS_*`, `S3_BUCKET`, `S3_ENDPOINT` | βλ. [STORAGE.md](../infrastructure/STORAGE.md#ρυθμίσεις) | Αποθήκευση αρχείων (S3) |
 | `LOG_LEVEL` | `info` | Επίπεδο logs |
+| `AUDIT_RETENTION_DAYS` | `365` | Πόσες μέρες κρατιούνται οι εγγραφές του audit log |
 
 - Το `.env.test` υπερισχύει όταν τρέχουν τα tests (`LIMITER_STORE=memory`).
 - Νέα μεταβλητή: πρόσθεσέ τη στο `start/env.ts` **και** στο `.env.example`.
@@ -204,7 +210,9 @@ apps/api/
      .as('categories')
    ```
 
-5. **Tests** στο `tests/functional/categories.spec.ts`.
+5. **Audit:** αν οι αλλαγές πρέπει να καταγράφονται, πρόσθεσε το `withAudit()` στο model (βλ. [AUDIT.md](AUDIT.md#audit-σε-νέο-model)).
+
+6. **Tests** στο `tests/functional/categories.spec.ts`.
 
 > [!IMPORTANT]
 > Στο Adonis ένα route είναι **ανοιχτό**, εκτός αν μπει σε group με `middleware.auth()`. Βάζε κάθε νέο route που θέλει login μέσα στο υπάρχον group του `start/routes.ts`.

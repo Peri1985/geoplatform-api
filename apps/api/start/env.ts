@@ -52,4 +52,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   S3_BUCKET: Env.schema.string(),
   // Only for S3-compatible storage (RustFS, R2, ...); empty for AWS S3
   S3_ENDPOINT: Env.schema.string.optional({ format: 'url', tld: false }),
+
+  // How many days audit log entries are kept (default 365)
+  AUDIT_RETENTION_DAYS: Env.schema.number.optional(),
 })

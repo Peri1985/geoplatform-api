@@ -1,5 +1,8 @@
 import { FileSchema } from '#database/schema'
+import { withAudit } from '#mixins/with_audit'
 import User from '#models/user'
+import { audit } from '#services/audit'
+import { compose } from '@adonisjs/core/helpers'
 import drive from '@adonisjs/drive/services/main'
 import { belongsTo, scope } from '@adonisjs/lucid/orm'
 import type { LucidModel, LucidRow } from '@adonisjs/lucid/types/model'
@@ -24,7 +27,7 @@ function attachableTypeOf(record: LucidRow) {
  * Lucid has no polymorphic relations, so attaching and querying go through the
  * attachTo() method and the attachedTo scope below.
  */
-export default class File extends FileSchema {
+export default class File extends compose(FileSchema, withAudit()) {
   @belongsTo(() => User, { foreignKey: 'ownerId' })
   declare owner: BelongsTo<typeof User>
 
@@ -57,10 +60,17 @@ export default class File extends FileSchema {
   }
 
   /**
-   * A temporary download URL; the bucket itself is private
+   * A temporary download URL; the bucket itself is private. Recorded in the audit log:
+   * the download itself goes straight to S3, so issuing the URL is what we can see.
    */
-  signedUrl() {
-    return drive.use().getSignedUrl(this.key, { expiresIn: URL_EXPIRES_IN })
+  async signedUrl() {
+    const url = await drive.use().getSignedUrl(this.key, { expiresIn: URL_EXPIRES_IN })
+    await audit({
+      action: 'files.url_issued',
+      subject: this,
+      changes: { expiresIn: URL_EXPIRES_IN },
+    })
+    return url
   }
 
   /**
