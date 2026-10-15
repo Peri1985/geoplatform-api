@@ -7,12 +7,19 @@
     "lint": "turbo run lint",
     "test": "turbo run test"
   },
-  "packageManager": "pnpm@10.30.0",
+  "packageManager": "npm@11.19.1",
   "devDependencies": {
     "turbo": "^2.11.8",
-    "typescript": "catalog:"
+    "typescript": "~6.0.2"
   },
   "engines": {
     "node": ">=24.22.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "allowScripts": {
+    "@swc/core@1.16.18": true
   }
 }

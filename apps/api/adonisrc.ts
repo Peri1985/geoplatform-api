@@ -1,7 +1,6 @@
 import { indexEntities } from '@adonisjs/core/generators'
 import { defineConfig } from '@adonisjs/core/app'
 import { generateRegistry } from '@tuyau/core/hooks'
-import { indexPolicies } from '@adonisjs/bouncer'
 
 export default defineConfig({
   /*
@@ -25,11 +24,7 @@ export default defineConfig({
   | will be scanned automatically from the "./commands" directory.
   |
   */
-  commands: [
-    () => import('@adonisjs/core/commands'),
-    () => import('@adonisjs/lucid/commands'),
-    () => import('@adonisjs/bouncer/commands'),
-  ],
+  commands: [() => import('@adonisjs/core/commands'), () => import('@adonisjs/lucid/commands')],
 
   /*
   |--------------------------------------------------------------------------
@@ -48,14 +43,13 @@ export default defineConfig({
       environment: ['repl', 'test'],
     },
     () => import('@adonisjs/core/providers/vinejs_provider'),
+    () => import('@adonisjs/redis/redis_provider'),
+    () => import('@adonisjs/limiter/limiter_provider'),
     () => import('@adonisjs/shield/shield_provider'),
     () => import('@adonisjs/lucid/database_provider'),
     () => import('@adonisjs/cors/cors_provider'),
     () => import('@adonisjs/auth/auth_provider'),
     () => import('#providers/api_provider'),
-    () => import('@adonisjs/bouncer/bouncer_provider'),
-    () => import('@adonisjs/redis/redis_provider'),
-    () => import('@adonisjs/limiter/limiter_provider'),
   ],
 
   /*
@@ -114,7 +108,6 @@ export default defineConfig({
         transformers: { enabled: true },
       }),
       generateRegistry(),
-      indexPolicies(),
     ],
   },
 })

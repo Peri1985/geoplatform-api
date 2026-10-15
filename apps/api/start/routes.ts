@@ -42,27 +42,6 @@ router
           })
           .prefix('account')
           .as('profile')
-
-        router
-          .group(() => {
-            router.get('/', [controllers.Places, 'index']).as('index')
-            router.get('nearby', [controllers.Places, 'nearby']).as('nearby')
-            router.post('/', [controllers.Places, 'store']).as('store')
-            router.patch(':id', [controllers.Places, 'update']).as('update')
-            router.delete(':id', [controllers.Places, 'destroy']).as('destroy')
-          })
-          .prefix('places')
-          .as('places')
-          .where('id', router.matchers.number())
-
-        router
-          .group(() => {
-            router.get('/', [controllers.Users, 'index']).as('index')
-            router.patch(':id', [controllers.Users, 'update']).as('update')
-          })
-          .prefix('users')
-          .as('users')
-          .where('id', router.matchers.number())
       })
       .use(middleware.auth())
   })

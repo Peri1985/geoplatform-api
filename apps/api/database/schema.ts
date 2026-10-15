@@ -43,21 +43,6 @@ export class AuthAccessTokenSchema extends BaseModel {
   declare updatedAt: DateTime | null
 }
 
-export class PlaceSchema extends BaseModel {
-  static $columns = ['createdAt', 'createdById', 'id', 'name', 'updatedAt'] as const
-  $columns = PlaceSchema.$columns
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
-  @column()
-  declare createdById: number | null
-  @column({ isPrimary: true })
-  declare id: number
-  @column()
-  declare name: string
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime | null
-}
-
 export class SpatialRefSySchema extends BaseModel {
   static $columns = ['authName', 'authSrid', 'proj4Text', 'srid', 'srtext'] as const
   $columns = SpatialRefSySchema.$columns
@@ -74,16 +59,7 @@ export class SpatialRefSySchema extends BaseModel {
 }
 
 export class UserSchema extends BaseModel {
-  static $columns = [
-    'createdAt',
-    'email',
-    'fullName',
-    'id',
-    'isActive',
-    'password',
-    'role',
-    'updatedAt',
-  ] as const
+  static $columns = ['createdAt', 'email', 'fullName', 'id', 'password', 'updatedAt'] as const
   $columns = UserSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -93,12 +69,8 @@ export class UserSchema extends BaseModel {
   declare fullName: string | null
   @column({ isPrimary: true })
   declare id: number
-  @column()
-  declare isActive: boolean
   @column({ serializeAs: null })
   declare password: string
-  @column()
-  declare role: 'admin' | 'user'
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 }

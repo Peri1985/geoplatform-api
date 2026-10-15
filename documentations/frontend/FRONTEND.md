@@ -10,12 +10,12 @@
 ## Εκκίνηση
 
 ```bash
-pnpm dev                     # όλα (api, admin, account, shared)
-pnpm --filter admin dev      # μόνο το admin
-pnpm turbo dev --filter admin...   # το admin μαζί με ό,τι χρειάζεται (shared σε watch)
+npm run dev                        # όλα (api, admin, account, shared)
+npm run dev -w admin               # μόνο το admin
+npx turbo dev --filter admin...    # το admin μαζί με ό,τι χρειάζεται (shared σε watch)
 ```
 
-| Εντολή (`pnpm --filter <app> ...`) | Τι κάνει |
+| Εντολή (`npm run <script> -w <app>`) | Τι κάνει |
 | --- | --- |
 | `dev` | Dev server με hot reload |
 | `build` | Typecheck (`tsc -b`) και production build στο `dist/` |
@@ -49,10 +49,10 @@ const health = HealthSchema.parse(await fetch('/api/v1/health').then((r) => r.js
 Οι απαντήσεις του api είναι τυλιγμένες σε `data`, και τα σφάλματα σε `errors` (βλ. [API.md](../backend/API.md#μορφή-απαντήσεων)):
 
 ```ts
-const response = await fetch('/api/v1/places', {
+const response = await fetch('/api/v1/account/profile', {
   headers: { Authorization: `Bearer ${token}` },
 });
-const { data: places } = await response.json();
+const { data: user } = await response.json();
 ```
 
 Τα schemas και οι types των δεδομένων έρχονται από το `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)).
@@ -88,9 +88,9 @@ const { data: places } = await response.json();
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
-    "oxlint": "catalog:",
+    "oxlint": "^1.81.0",
     "react": "^19.2.8",
-    "typescript": "catalog:"
+    "typescript": "~6.0.2"
   }
 }
 ```
@@ -141,10 +141,13 @@ export type { ButtonProps } from './Button'
 
 ### 3. Χρήση σε app
 
-```bash
-pnpm --filter admin add @repo/ui@workspace:*
-pnpm --filter account add @repo/ui@workspace:*
+Στο `package.json` του app (`apps/admin`, `apps/account`), πρόσθεσε στα `dependencies`:
+
+```json
+"@repo/ui": "*"
 ```
+
+και τρέξε `npm install` από το root. Το `"*"` λέει στο npm να συνδέσει το τοπικό πακέτο του workspace, όπως γίνεται ήδη με το `@repo/shared`.
 
 ```tsx
 import { Button } from '@repo/ui'
@@ -156,10 +159,10 @@ import { Button } from '@repo/ui'
 
 ## Νέο frontend app
 
-1. `pnpm create vite apps/<όνομα> --template react-ts`
-2. Στο `package.json` του app, άλλαξε τις εκδόσεις των `typescript`, `vite`, `oxlint` και `@types/node` σε `"catalog:"` και πρόσθεσε `"@repo/shared": "workspace:*"`.
+1. `npm create vite@latest apps/<όνομα> --template react-ts`
+2. Στο `package.json` του app, βάλε στα `typescript`, `vite`, `oxlint` και `@types/node` τις **ίδιες εκδόσεις** με το `apps/admin/package.json`, και πρόσθεσε `"@repo/shared": "*"` στα `dependencies`.
 3. Στο `vite.config.ts`, δώσε δικό του port (π.χ. `5175`) με `strictPort: true`, και τον ίδιο proxy για το `/api`.
-4. `pnpm install` από το root.
+4. Σβήσε το `package-lock.json` και τον φάκελο `node_modules` που μπορεί να έφτιαξε το `create vite` μέσα στο app, και τρέξε `npm install` από το root.
 5. Πρόσθεσέ το στον πίνακα στην αρχή αυτού του αρχείου και στο root `README.md`.
 
 ## Κανόνες

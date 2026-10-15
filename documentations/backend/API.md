@@ -1,9 +1,9 @@
 # Backend (API)
 
-Το backend είναι εφαρμογή [AdonisJS](https://docs.adonisjs.com) 7 στο `apps/api`. Είναι γραμμένο σε TypeScript 6 ως ESM, και όλα τα routes είναι κάτω από το `/api/v1`.
+Το backend είναι εφαρμογή [AdonisJS](https://docs.adonisjs.com) 7 στο `apps/api`. Είναι γραμμένο σε TypeScript 6 ως ESM, και όλα τα routes είναι κάτω από το `/api/v1`. Ξεκίνησε από το επίσημο API starter kit, προσαρμοσμένο σε PostgreSQL, χωρίς sessions και cookies.
 
 - Βάση και migrations: [DB.md](DB.md)
-- Login, tokens και δικαιώματα: [AUTH.md](AUTH.md)
+- Login και tokens: [AUTH.md](AUTH.md)
 
 > [!IMPORTANT]
 > Χρειάζεται **Node 24.22 ή νεότερο** (`.nvmrc` στο root). Με το Node 24.0.0 το Adonis σκάει με `addQueryContext is not a function` μόλις ανοίξει σύνδεση με τη βάση.
@@ -25,19 +25,18 @@
 Από το root του repo:
 
 ```bash
-docker compose up -d postgres redis                  # βάση και Redis (βλ. infrastructure/DOCKER.md)
-cp apps/api/.env.example apps/api/.env               # μία φορά
-pnpm --filter api ace generate:key                   # μία φορά: γεμίζει το APP_KEY
-pnpm --filter api ace migration:run                  # μία φορά, και μετά από κάθε νέο migration
-pnpm --filter api ace create:admin <email>           # ο πρώτος admin
-pnpm --filter api dev                                # http://localhost:3333/api/v1/health
+docker compose up -d postgres redis               # βάση και Redis (βλ. infrastructure/DOCKER.md)
+cp apps/api/.env.example apps/api/.env            # μία φορά
+npm run ace -w api -- generate:key                # μία φορά: γεμίζει το APP_KEY
+npm run ace -w api -- migration:run               # μία φορά, και μετά από κάθε νέο migration
+npm run dev -w api                                # http://localhost:3333/api/v1/health
 ```
 
-Ή `pnpm dev` από το root, για να σηκωθούν μαζί και τα frontends.
+Ή `npm run dev` από το root, για να σηκωθούν μαζί και τα frontends.
 
-Το `pnpm --filter api ace <εντολή>` τρέχει το `node ace <εντολή>` μέσα στο `apps/api`. Αν είσαι ήδη μέσα στον φάκελο, γράψε απευθείας `node ace <εντολή>`. Το `node ace list` δείχνει όλες τις εντολές.
+Το `npm run ace -w api -- <εντολή>` τρέχει το `node ace <εντολή>` μέσα στο `apps/api`. Το `--` χρειάζεται για να φτάσουν οι σημαίες της εντολής στο Adonis (π.χ. `-- migration:fresh --drop-types`). Αν είσαι ήδη μέσα στον φάκελο, γράψε απευθείας `node ace <εντολή>`. Το `node ace list` δείχνει όλες τις εντολές.
 
-| Εντολή (`pnpm --filter api ...`) | Τι κάνει |
+| Εντολή (`npm run <script> -w api`) | Τι κάνει |
 | --- | --- |
 | `dev` | Dev server με hot reload (`node ace serve --hmr`) |
 | `build` | Production build στο `build/` |
@@ -46,7 +45,7 @@ pnpm --filter api dev                                # http://localhost:3333/api
 | `format` | Prettier |
 | `typecheck` | `tsc --noEmit` |
 | `test` | Όλα τα tests (Japa). Χρειάζονται βάση και Redis |
-| `ace <εντολή>` | Οποιαδήποτε εντολή `node ace` (migrations, `make:*`, `create:admin`) |
+| `ace -- <εντολή>` | Οποιαδήποτε εντολή `node ace` (migrations, `make:*`) |
 
 ## Δομή
 
@@ -55,21 +54,18 @@ apps/api/
 ├── .env.example            # μεταβλητές περιβάλλοντος (αντιγράφεται σε .env)
 ├── adonisrc.ts             # providers, εντολές, test suites
 ├── app/
-│   ├── abilities/main.ts   # δικαιώματα που δεν αφορούν συγκεκριμένη εγγραφή (π.χ. manageUsers)
-│   ├── columns/point.ts    # στήλη Lucid για PostGIS Point ↔ GeoJSON
 │   ├── controllers/        # HTTP handlers, ένας ανά πόρο
 │   ├── exceptions/         # μετατροπή σφαλμάτων σε απαντήσεις
-│   ├── middleware/         # auth, bouncer, JSON
-│   ├── models/             # Lucid models (user, place)
-│   ├── policies/           # δικαιώματα πάνω σε εγγραφή (π.χ. PlacePolicy)
+│   ├── middleware/         # auth, JSON
+│   ├── models/             # Lucid models (user)
 │   ├── transformers/       # τι επιστρέφεται από κάθε model
 │   └── validators/         # VineJS: έλεγχος body και query
-├── commands/               # δικές μας εντολές ace (create:admin)
 ├── config/                 # ρυθμίσεις: auth, database, redis, limiter, cors...
 ├── database/
 │   ├── migrations/         # migrations της βάσης
 │   ├── schema.ts           # ΠΑΡΑΓΕΤΑΙ αυτόματα από τη βάση, μην το αλλάζεις
-│   └── schema_rules.ts     # κανόνες για το schema.ts (π.χ. τύπος του role)
+│   └── schema_rules.ts     # κανόνες για το schema.ts (τύποι στηλών)
+├── providers/              # το api_provider τυλίγει τις απαντήσεις σε { data }
 ├── start/
 │   ├── env.ts              # έλεγχος των μεταβλητών του .env
 │   ├── kernel.ts           # middleware
@@ -81,15 +77,14 @@ apps/api/
 └── .adonisjs/              # ΠΑΡΑΓΕΤΑΙ αυτόματα (indexes, typed routes)
 ```
 
-Για κάθε πόρο (π.χ. places) υπάρχουν τα εξής αρχεία:
+Για κάθε πόρο υπάρχουν τα εξής αρχεία (παράδειγμα με `categories`):
 
 | Αρχείο | Ρόλος |
 | --- | --- |
-| `app/models/place.ts` | Ο πίνακας της βάσης (Lucid). Επεκτείνει το παραγόμενο `PlaceSchema` |
-| `app/validators/place.ts` | Τι δεχόμαστε στο body και στο query |
-| `app/controllers/places_controller.ts` | Τα endpoints: έλεγχος input, δικαιωμάτων, κλήση στο model |
-| `app/policies/place_policy.ts` | Ποιος μπορεί να κάνει τι πάνω σε ένα place |
-| `app/transformers/place_transformer.ts` | Ποια πεδία επιστρέφονται |
+| `app/models/category.ts` | Ο πίνακας της βάσης (Lucid). Επεκτείνει το παραγόμενο `CategorySchema` |
+| `app/validators/category.ts` | Τι δεχόμαστε στο body και στο query |
+| `app/controllers/categories_controller.ts` | Τα endpoints: έλεγχος input, κλήση στο model, απάντηση |
+| `app/transformers/category_transformer.ts` | Ποια πεδία επιστρέφονται |
 | `start/routes.ts` | Σε ποιο URL απαντάει κάθε μέθοδος του controller |
 
 ## Ρυθμίσεις (.env)
@@ -118,57 +113,37 @@ apps/api/
 | `POST` | `/api/v1/auth/login` | Δημόσιο | Login, επιστρέφει χρήστη και token |
 | `GET` | `/api/v1/account/profile` | Συνδεδεμένοι | Ο συνδεδεμένος χρήστης |
 | `POST` | `/api/v1/account/logout` | Συνδεδεμένοι | Ακυρώνει το token |
-| `GET` | `/api/v1/places` | Συνδεδεμένοι | Όλα τα σημεία, νεότερα πρώτα |
-| `GET` | `/api/v1/places/nearby?lat=&lon=&radius=` | Συνδεδεμένοι | Σημεία σε ακτίνα `radius` μέτρων (default 1000, max 100000), πιο κοντινά πρώτα |
-| `POST` | `/api/v1/places` | Συνδεδεμένοι | Νέο σημείο, με ιδιοκτήτη τον χρήστη (`201`) |
-| `PATCH` | `/api/v1/places/:id` | Ιδιοκτήτης ή admin | Αλλαγή ονόματος ή θέσης |
-| `DELETE` | `/api/v1/places/:id` | Ιδιοκτήτης ή admin | Διαγραφή (`204`) |
-| `GET` | `/api/v1/users` | Admin | Όλοι οι χρήστες |
-| `PATCH` | `/api/v1/users/:id` | Admin | Αλλαγή ρόλου ή απενεργοποίηση |
 
-Λεπτομέρειες για auth και δικαιώματα: [AUTH.md](AUTH.md). Παραδείγματα (το `$TOKEN` είναι το `token` από το login):
-
-```bash
-curl -X POST http://localhost:3333/api/v1/places \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"name":"Λιμάνι Πειραιά","location":{"type":"Point","coordinates":[23.64,37.942]}}'
-
-curl "http://localhost:3333/api/v1/places/nearby?lat=37.943&lon=23.647&radius=2000" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Οι θέσεις είναι GeoJSON με σειρά `[longitude, latitude]` (βλ. [DB.md](DB.md#γεωχωρικά-δεδομένα-postgis)).
+Λεπτομέρειες και παραδείγματα: [AUTH.md](AUTH.md).
 
 ## Μορφή απαντήσεων
 
 Οι επιτυχημένες απαντήσεις είναι τυλιγμένες σε `data`. Αυτό το κάνει το `ctx.serialize(...)` (`providers/api_provider.ts`):
 
 ```json
-{ "data": { "id": 20, "name": "Λιμάνι", "location": { "type": "Point", "coordinates": [23.64, 37.942] }, "createdById": 96, "createdAt": "2026-10-15T11:10:46.354+00:00", "updatedAt": "2026-10-15T11:10:46.354+00:00" } }
+{ "data": { "id": 1, "fullName": "Maria P", "email": "maria@example.com", "createdAt": "2026-10-15T11:10:46.354+00:00", "updatedAt": "2026-10-15T11:10:46.354+00:00", "initials": "MP" } }
 ```
 
 Τα σφάλματα έρχονται ως λίστα `errors`:
 
 | Κωδικός | Πότε | Παράδειγμα |
 | --- | --- | --- |
-| `400` | Λάθος email ή κωδικός, ή μη επιτρεπτή ενέργεια | `{"errors":[{"message":"Invalid user credentials"}]}` |
+| `400` | Λάθος email ή κωδικός | `{"errors":[{"message":"Invalid user credentials"}]}` |
 | `401` | Λείπει ή είναι άκυρο το token | `{"errors":[{"message":"Unauthorized access"}]}` |
-| `403` | Το token είναι έγκυρο, αλλά δεν υπάρχει δικαίωμα | `{"errors":[{"message":"Access denied"}]}` |
 | `404` | Δεν υπάρχει η εγγραφή | |
 | `422` | Λάθος δεδομένα, ένα στοιχείο ανά πεδίο | `{"errors":[{"message":"The email field must be a valid email address","rule":"email","field":"email"}]}` |
 | `429` | Πάρα πολλά requests στα `/auth/*` | |
 
 ## Νέα λειτουργία, βήμα-βήμα
 
-Παράδειγμα: κατηγορίες (`categories`). Τα places είναι το πρότυπο που αντιγράφεις.
+Παράδειγμα: κατηγορίες (`categories`).
 
-1. **Migration** για τον πίνακα (βλ. [DB.md](DB.md#ροή-αλλαγή-στο-schema)):
+1. **Migration** για τον πίνακα (βλ. [DB.md](DB.md#ροή-νέος-πίνακας)):
 
    ```bash
-   pnpm --filter api ace make:migration categories
+   npm run ace -w api -- make:migration categories
    # γράψε το createTable στο αρχείο, μετά:
-   pnpm --filter api ace migration:run
+   npm run ace -w api -- migration:run
    ```
 
    Το `migration:run` ξαναπαράγει το `database/schema.ts` με την κλάση `CategorySchema`.
@@ -176,7 +151,7 @@ curl "http://localhost:3333/api/v1/places/nearby?lat=37.943&lon=23.647&radius=20
 2. **Model**, που επεκτείνει το παραγόμενο schema:
 
    ```bash
-   pnpm --filter api ace make:model category
+   npm run ace -w api -- make:model category
    ```
 
    ```ts
@@ -188,9 +163,27 @@ curl "http://localhost:3333/api/v1/places/nearby?lat=37.943&lon=23.647&radius=20
 3. **Validator, transformer, controller:**
 
    ```bash
-   pnpm --filter api ace make:validator category
-   pnpm --filter api ace make:transformer category
-   pnpm --filter api ace make:controller categories
+   npm run ace -w api -- make:validator category
+   npm run ace -w api -- make:transformer category
+   npm run ace -w api -- make:controller categories
+   ```
+
+   Παράδειγμα controller:
+
+   ```ts
+   export default class CategoriesController {
+     async index({ serialize }: HttpContext) {
+       const categories = await Category.query().orderBy('name')
+       return serialize(CategoryTransformer.transform(categories))
+     }
+
+     async store({ request, response, serialize }: HttpContext) {
+       const data = await request.validateUsing(createCategoryValidator)
+       const category = await Category.create(data)
+       response.status(201)
+       return serialize(CategoryTransformer.transform(category))
+     }
+   }
    ```
 
 4. **Routes** στο `start/routes.ts`. Αν τα endpoints θέλουν login, μπαίνουν **μέσα** στο group με `middleware.auth()`:
@@ -205,34 +198,32 @@ curl "http://localhost:3333/api/v1/places/nearby?lat=37.943&lon=23.647&radius=20
      .as('categories')
    ```
 
-5. **Δικαιώματα**, αν χρειάζονται: policy (`ace make:policy category`) ή ability στο `app/abilities/main.ts` (βλ. [AUTH.md](AUTH.md#δικαιώματα-στον-κώδικα)).
-
-6. **Tests** στο `tests/functional/categories.spec.ts`.
+5. **Tests** στο `tests/functional/categories.spec.ts`.
 
 > [!IMPORTANT]
 > Στο Adonis ένα route είναι **ανοιχτό**, εκτός αν μπει σε group με `middleware.auth()`. Βάζε κάθε νέο route που θέλει login μέσα στο υπάρχον group του `start/routes.ts`.
 
-Μετά από νέο controller, το `#generated/controllers` ενημερώνεται μόνο του όταν τρέχει το `dev` ή το `build`.
+Μετά από νέο controller, το `#generated/controllers` ενημερώνεται μόνο του όταν τρέχει το `dev` ή το `build`. Αν κάποια εντολή `ace` σκάσει με `Cannot read properties of undefined (reading 'name')` στο `start/routes.ts`, τρέξε μία φορά `npm run build -w api`.
 
 ## Validation
 
 Το input ελέγχεται με [VineJS](https://vinejs.dev), τον validator του Adonis, στο `app/validators/`:
 
 ```ts
-// app/validators/place.ts
-export const createPlaceValidator = vine.create({
-  name: vine.string().trim().minLength(1).maxLength(200),
-  location: point(),
+// app/validators/user.ts
+export const loginValidator = vine.create({
+  email: email(),
+  password: vine.string(),
 })
 
-// app/controllers/places_controller.ts
-const data = await request.validateUsing(createPlaceValidator)
+// στον controller
+const { email, password } = await request.validateUsing(loginValidator)
 ```
 
 - Αν τα δεδομένα είναι σωστά, το `validateUsing` επιστρέφει τα **καθαρισμένα** δεδομένα (`trim`, πεζά email, αριθμοί από το query string), με σωστούς TypeScript τύπους.
 - Αν δεν είναι, απαντάει `422` με ένα σφάλμα ανά πεδίο.
 
-Τα frontends μπορούν να ελέγχουν τις φόρμες με τα Zod schemas του `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)). Αν αλλάξεις έναν κανόνα (π.χ. μέγιστο μήκος), άλλαξέ τον και στα δύο σημεία.
+Τα frontends μπορούν να ελέγχουν τις φόρμες με Zod schemas στο `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)). Αν αλλάξεις έναν κανόνα (π.χ. μέγιστο μήκος), άλλαξέ τον και στα δύο σημεία.
 
 ## Tests
 
@@ -244,9 +235,9 @@ const data = await request.validateUsing(createPlaceValidator)
 | `unit` | `tests/unit/*.spec.ts` | Μεμονωμένες συναρτήσεις (δεν υπάρχουν ακόμα) |
 
 ```bash
-pnpm --filter api test                        # όλα
-pnpm --filter api ace test functional         # ένα suite
-pnpm --filter api ace test --files=places     # ένα αρχείο
+npm run test -w api                           # όλα
+npm run ace -w api -- test functional         # ένα suite
+npm run ace -w api -- test --files=auth       # ένα αρχείο
 ```
 
 Χρειάζονται τη βάση (`docker compose up -d postgres`). Κάθε test τρέχει μέσα σε transaction που αναιρείται στο τέλος (`isolate(group)` στο `tests/helpers.ts`), οπότε τα δεδομένα των tests δεν μένουν στη βάση.
@@ -255,14 +246,14 @@ pnpm --filter api ace test --files=places     # ένα αρχείο
 
 ```ts
 const user = await createUser()
-const response = await client.get('/api/v1/places').loginAs(user)
+const response = await client.get('/api/v1/account/profile').loginAs(user)
 response.assertStatus(200)
 ```
 
 ## Κανόνες κώδικα
 
-- **Imports με aliases**, όχι με σχετικά paths: `#models/user`, `#validators/place`, `#columns/point` (ορίζονται στο `imports` του `package.json`).
+- **Imports με aliases**, όχι με σχετικά paths: `#models/user`, `#validators/user` (ορίζονται στο `imports` του `package.json`).
 - **Μην αλλάζεις τα παραγόμενα αρχεία:** `database/schema.ts` και `.adonisjs/`. Αλλαγές στους τύπους του schema γίνονται στο `database/schema_rules.ts`.
-- **Ο controller μένει λεπτός:** έλεγχος input, έλεγχος δικαιωμάτων, κλήση στο model, απάντηση. Σύνθετα queries μπαίνουν σε scopes του model (όπως το `withinRadius`).
-- **Σε εντολές ace,** τα models φορτώνονται μέσα στο `run()` (`await import('#models/user')`), γιατί τα services (hash, db) είναι έτοιμα μόνο αφού ξεκινήσει η εφαρμογή.
-- **Πριν από commit:** `pnpm lint`, `pnpm --filter api typecheck` και `pnpm test` από το root.
+- **Ο controller μένει λεπτός:** έλεγχος input, κλήση στο model, απάντηση. Σύνθετα queries μπαίνουν σε scopes του model.
+- **Σε εντολές ace** (`commands/`), τα models φορτώνονται μέσα στο `run()` (`await import('#models/user')`), γιατί τα services (hash, db) είναι έτοιμα μόνο αφού ξεκινήσει η εφαρμογή.
+- **Πριν από commit:** `npm run lint`, `npm run typecheck -w api` και `npm test` από το root.

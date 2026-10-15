@@ -105,7 +105,7 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 
 | Volume | Τι κρατάει | Αν το σβήσεις |
 | --- | --- | --- |
-| `geoplatform_postgres-data` | Η βάση της εφαρμογής | Χάνονται όλα τα δεδομένα. Ξανατρέχεις `ace migration:run` και `ace create:admin` (βλ. [DB.md](../backend/DB.md#reset-τοπικής-βάσης)) |
+| `geoplatform_postgres-data` | Η βάση της εφαρμογής | Χάνονται όλα τα δεδομένα. Ξανατρέχεις `ace migration:run` (βλ. [DB.md](../backend/DB.md#reset-τοπικής-βάσης)) |
 | `geoplatform_redis-data` | Τα δεδομένα του Redis | Μηδενίζονται τα όρια requests |
 | `geoplatform_nominatim-data` | Η βάση του Nominatim | Ξανά import (~15–30 λεπτά) |
 | `geoplatform_photon-data` | Το index του Photon | Ξανά index από το Nominatim (~4 λεπτά) |

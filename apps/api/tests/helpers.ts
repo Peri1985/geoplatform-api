@@ -11,15 +11,9 @@ let counter = 0
 /**
  * A user in the test database (rolled back after each test)
  */
-export function createUser(attributes: Partial<Pick<User, 'role' | 'isActive'>> = {}) {
+export function createUser() {
   counter++
-  return User.create({
-    email: `user${counter}@test.local`,
-    password,
-    role: 'user',
-    isActive: true,
-    ...attributes,
-  })
+  return User.create({ email: `user${counter}@test.local`, password })
 }
 
 /**

@@ -21,15 +21,4 @@ export interface ApiDefinition {
       destroy: typeof routes['profile.access_tokens.destroy']
     }
   }
-  places: {
-    index: typeof routes['places.index']
-    nearby: typeof routes['places.nearby']
-    store: typeof routes['places.store']
-    update: typeof routes['places.update']
-    destroy: typeof routes['places.destroy']
-  }
-  users: {
-    index: typeof routes['users.index']
-    update: typeof routes['users.update']
-  }
 }

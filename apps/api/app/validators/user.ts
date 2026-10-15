@@ -25,11 +25,3 @@ export const loginValidator = vine.create({
   email: email(),
   password: vine.string(),
 })
-
-/**
- * Changes an admin can make to another user
- */
-export const updateUserValidator = vine.create({
-  role: vine.enum(['admin', 'user'] as const).optional(),
-  isActive: vine.boolean().optional(),
-})
