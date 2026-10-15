@@ -1,0 +1,85 @@
+# Local services for development: PostGIS, Redis, Nominatim and Photon.
+# Settings come from .env (copy .env.example). See the README, "Docker".
+name: geoplatform
+
+services:
+  postgres:
+    # Multi-arch build of the official PostGIS image (postgis/postgis is amd64 only)
+    image: imresamu/postgis:18-3.6
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geoplatform}
+      POSTGRES_USER: ${POSTGRES_USER:-geoplatform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geoplatform}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.8
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  nominatim:
+    image: mediagis/nominatim:5.3
+    environment:
+      PBF_URL: ${NOMINATIM_PBF_URL:-https://download.geofabrik.de/europe/greece-latest.osm.pbf}
+      REPLICATION_URL: ${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe/greece-updates/}
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-nominatim}
+      IMPORT_STYLE: full
+      IMPORT_WIKIPEDIA: ${NOMINATIM_IMPORT_WIKIPEDIA:-false}
+      THREADS: 4
+      # The image defaults expect a large server (10GB maintenance_work_mem); sized here for ~8GB of Docker memory
+      POSTGRES_SHARED_BUFFERS: 512MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 1GB
+      POSTGRES_AUTOVACUUM_WORK_MEM: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 2GB
+    ports:
+      - "127.0.0.1:${NOMINATIM_PORT:-8080}:8080"
+    volumes:
+      - nominatim-data:/var/lib/postgresql/16/main
+    shm_size: 1gb
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # The first import (Greece) takes tens of minutes
+      start_period: 3h
+    restart: unless-stopped
+
+  photon:
+    build: ./docker/photon
+    environment:
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-nominatim}
+      PHOTON_LANGUAGES: ${PHOTON_LANGUAGES:-el,en}
+      JAVA_OPTS: -Xmx1g
+    ports:
+      - "127.0.0.1:${PHOTON_PORT:-2322}:2322"
+    volumes:
+      - photon-data:/photon/data
+    depends_on:
+      nominatim:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  nominatim-data:
+  photon-data:
