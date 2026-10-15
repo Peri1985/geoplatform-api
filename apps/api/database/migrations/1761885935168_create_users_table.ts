@@ -5,7 +5,8 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.increments('id').notNullable()
+      // gen_random_uuid() is built into PostgreSQL 13+
+      table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))
       table.string('full_name').nullable()
       table.string('email', 254).notNullable().unique()
       table.string('password').notNullable()

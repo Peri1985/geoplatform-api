@@ -36,6 +36,30 @@ const routes = {
     tokens: [{"old":"/api/v1/account/logout","type":0,"val":"api","end":""},{"old":"/api/v1/account/logout","type":0,"val":"v1","end":""},{"old":"/api/v1/account/logout","type":0,"val":"account","end":""},{"old":"/api/v1/account/logout","type":0,"val":"logout","end":""}],
     types: placeholder as Registry['profile.access_tokens.destroy']['types'],
   },
+  'files.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/files',
+    tokens: [{"old":"/api/v1/files","type":0,"val":"api","end":""},{"old":"/api/v1/files","type":0,"val":"v1","end":""},{"old":"/api/v1/files","type":0,"val":"files","end":""}],
+    types: placeholder as Registry['files.index']['types'],
+  },
+  'files.store': {
+    methods: ["POST"],
+    pattern: '/api/v1/files',
+    tokens: [{"old":"/api/v1/files","type":0,"val":"api","end":""},{"old":"/api/v1/files","type":0,"val":"v1","end":""},{"old":"/api/v1/files","type":0,"val":"files","end":""}],
+    types: placeholder as Registry['files.store']['types'],
+  },
+  'files.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/files/:id',
+    tokens: [{"old":"/api/v1/files/:id","type":0,"val":"api","end":""},{"old":"/api/v1/files/:id","type":0,"val":"v1","end":""},{"old":"/api/v1/files/:id","type":0,"val":"files","end":""},{"old":"/api/v1/files/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['files.show']['types'],
+  },
+  'files.destroy': {
+    methods: ["DELETE"],
+    pattern: '/api/v1/files/:id',
+    tokens: [{"old":"/api/v1/files/:id","type":0,"val":"api","end":""},{"old":"/api/v1/files/:id","type":0,"val":"v1","end":""},{"old":"/api/v1/files/:id","type":0,"val":"files","end":""},{"old":"/api/v1/files/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['files.destroy']['types'],
+  },
 } as const satisfies Record<string, AdonisEndpoint>
 
 export { routes }

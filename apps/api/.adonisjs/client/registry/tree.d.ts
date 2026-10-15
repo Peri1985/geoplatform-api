@@ -21,4 +21,10 @@ export interface ApiDefinition {
       destroy: typeof routes['profile.access_tokens.destroy']
     }
   }
+  files: {
+    index: typeof routes['files.index']
+    store: typeof routes['files.store']
+    show: typeof routes['files.show']
+    destroy: typeof routes['files.destroy']
+  }
 }

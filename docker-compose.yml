@@ -1,4 +1,4 @@
-# Local services for development: PostGIS, Redis, Nominatim and Photon.
+# Local services for development: PostGIS, Redis, RustFS (S3), Nominatim and Photon.
 # Settings come from .env (copy .env.example). See the README, "Docker".
 name: geoplatform
 
@@ -34,6 +34,57 @@ services:
       timeout: 3s
       retries: 10
     restart: unless-stopped
+
+  # S3-compatible object storage (see documentations/infrastructure/STORAGE.md)
+  rustfs:
+    image: rustfs/rustfs:1.0.1
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-geoplatform}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-geoplatform-secret}
+    ports:
+      - "127.0.0.1:${RUSTFS_PORT:-9000}:9000" # S3 API
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001" # web console
+    volumes:
+      - rustfs-data:/data
+    depends_on:
+      rustfs-permissions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # RustFS runs as uid 10001 and needs to own its volume (as in RustFS's own compose file)
+  rustfs-permissions:
+    image: alpine:3.24
+    volumes:
+      - rustfs-data:/data
+    command: ["chown", "-R", "10001:10001", "/data"]
+    restart: "no"
+
+  # Creates the bucket once RustFS is up; does nothing if it already exists
+  rustfs-init:
+    image: amazon/aws-cli:2.38.1
+    environment:
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-geoplatform}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-geoplatform-secret}
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET: ${RUSTFS_BUCKET:-geoplatform}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$BUCKET" 2>/dev/null
+        || aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$BUCKET"
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    restart: "no"
 
   nominatim:
     image: mediagis/nominatim:5.3
@@ -81,5 +132,6 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  rustfs-data:
   nominatim-data:
   photon-data:

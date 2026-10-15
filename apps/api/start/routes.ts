@@ -42,6 +42,17 @@ router
           })
           .prefix('account')
           .as('profile')
+
+        router
+          .group(() => {
+            router.get('/', [controllers.Files, 'index']).as('index')
+            router.post('/', [controllers.Files, 'store']).as('store')
+            router.get(':id', [controllers.Files, 'show']).as('show')
+            router.delete(':id', [controllers.Files, 'destroy']).as('destroy')
+          })
+          .prefix('files')
+          .as('files')
+          .where('id', router.matchers.uuid())
       })
       .use(middleware.auth())
   })

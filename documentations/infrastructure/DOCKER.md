@@ -1,4 +1,4 @@
-# Docker (PostGIS, Redis, Nominatim, Photon)
+# Docker (PostGIS, Redis, RustFS, Nominatim, Photon)
 
 Οι εξωτερικές υπηρεσίες για την ανάπτυξη τρέχουν με Docker Compose. Η ρύθμιση είναι στο [docker-compose.yml](../../docker-compose.yml) στο root.
 
@@ -6,6 +6,7 @@
 | ----------- | ------------------------- | ------------------------------------------------------ | -------------- |
 | `postgres`  | `imresamu/postgis:18-3.6` | PostgreSQL 18 με PostGIS 3.6, η βάση της εφαρμογής     | 5432           |
 | `redis`     | `redis:8.8`               | Cache και queues                                       | 6379           |
+| `rustfs`    | `rustfs/rustfs:1.0.1`     | S3-compatible αποθήκευση αρχείων (βλ. [STORAGE.md](STORAGE.md)) | 9000 (API), 9001 (console) |
 | `nominatim` | `mediagis/nominatim:5.3`  | Geocoding και reverse geocoding από δεδομένα OSM       | 8080           |
 | `photon`    | build από `docker/photon` | Γρήγορη αναζήτηση και autocomplete, index από το Nominatim | 2322       |
 
@@ -22,16 +23,16 @@ docker compose up -d
 
 Η πρώτη εκκίνηση κατεβάζει τα δεδομένα OSM της **Ελλάδας** (~340 MB από [Geofabrik](https://download.geofabrik.de/europe/greece.html)) και κάνει import:
 
-1. Τα `postgres` και `redis` είναι έτοιμα σε λίγα δευτερόλεπτα.
+1. Τα `postgres`, `redis` και `rustfs` είναι έτοιμα σε λίγα δευτερόλεπτα. Το `rustfs-init` φτιάχνει το bucket και σταματάει (`Exited (0)`), που είναι φυσιολογικό.
 2. Το `nominatim` κάνει import, που διαρκεί **περίπου 15–30 λεπτά** ανάλογα με το μηχάνημα (~17 λεπτά σε Mac M-series με 8 GB για το Docker). Μέχρι να τελειώσει, το `docker compose ps` το δείχνει `health: starting`.
 3. Μόλις το Nominatim γίνει `healthy`, ξεκινάει το `photon` και φτιάχνει το index του (~4 λεπτά).
 
 Το `docker compose up -d` περιμένει να γίνει healthy το Nominatim, γιατί το Photon εξαρτάται από αυτό. Μπορείς να το αφήσεις να τρέχει ή να το διακόψεις με Ctrl+C: τα containers συνεχίζουν κανονικά.
 
-Αν χρειάζεσαι μόνο τη βάση για να δουλέψεις στο api, ξεκίνα μόνο αυτά:
+Αν χρειάζεσαι μόνο ό,τι θέλει το api, χωρίς geocoding, ξεκίνα μόνο αυτά:
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d postgres redis rustfs-init
 ```
 
 Η πρόοδος φαίνεται με:
@@ -55,7 +56,7 @@ curl "http://localhost:8080/search?q=Πειραιάς&format=json"   # Nominatim
 curl "http://localhost:2322/api?q=Πειραιά&lang=el"           # Photon
 ```
 
-Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplatform` και `redis://localhost:6379`. Το api συνδέεται με τη βάση και το Redis μέσω του `apps/api/.env` (βλ. [DB.md](../backend/DB.md#σύνδεση) και [API.md](../backend/API.md#ρυθμίσεις-env)). Το Redis το χρησιμοποιεί προς το παρόν για τα όρια requests στο login.
+Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplatform` και `redis://localhost:6379`. Το api συνδέεται με τη βάση και το Redis μέσω του `apps/api/.env` (βλ. [DB.md](../backend/DB.md#σύνδεση) και [API.md](../backend/API.md#ρυθμίσεις-env)). Το Redis το χρησιμοποιεί προς το παρόν για τα όρια requests στο login. Για το RustFS δες το [STORAGE.md](STORAGE.md#ρυθμίσεις).
 
 ## Nominatim και Photon: πότε ποιο
 
@@ -75,6 +76,9 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 | `POSTGRES_DB` / `_USER` / `_PASSWORD` | `geoplatform`                     | Βάση και χρήστης της εφαρμογής                                |
 | `POSTGRES_PORT`                       | `5432`                            | Port στο host                                                 |
 | `REDIS_PORT`                          | `6379`                            | Port στο host                                                 |
+| `RUSTFS_ACCESS_KEY` / `_SECRET_KEY`   | `geoplatform` / `geoplatform-secret` | Κλειδιά του S3 και στοιχεία του web console               |
+| `RUSTFS_BUCKET`                       | `geoplatform`                     | Το bucket που δημιουργείται αυτόματα                         |
+| `RUSTFS_PORT` / `RUSTFS_CONSOLE_PORT` | `9000` / `9001`                   | Ports στο host (S3 API / web console)                         |
 | `NOMINATIM_PBF_URL`                   | Ελλάδα από Geofabrik              | Ποια περιοχή OSM θα γίνει import                              |
 | `NOMINATIM_REPLICATION_URL`           | Ενημερώσεις Ελλάδας από Geofabrik | Από πού έρχονται οι ενημερώσεις                               |
 | `NOMINATIM_PASSWORD`                  | `nominatim`                       | Κωδικός της βάσης του Nominatim (τον χρησιμοποιεί το Photon)  |
@@ -83,7 +87,7 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 | `PHOTON_LANGUAGES`                    | `el,en`                           | Γλώσσες στο index του Photon                                  |
 | `PHOTON_PORT`                         | `2322`                            | Port στο host                                                 |
 
-**Port πιασμένο** (π.χ. από άλλο project): άλλαξέ το στο `.env`, π.χ. `POSTGRES_PORT=5434`. Αν αλλάξεις το `POSTGRES_PORT` ή το `REDIS_PORT`, άλλαξε αντίστοιχα και τα `DB_PORT` και `REDIS_PORT` στο `apps/api/.env`.
+**Port πιασμένο** (π.χ. από άλλο project): άλλαξέ το στο `.env`, π.χ. `POSTGRES_PORT=5434`. Αν αλλάξεις το `POSTGRES_PORT`, το `REDIS_PORT` ή το `RUSTFS_PORT`, άλλαξε αντίστοιχα και τα `DB_PORT`, `REDIS_PORT` και `S3_ENDPOINT` στο `apps/api/.env`.
 
 **Κωδικοί:** οι κωδικοί της βάσης ορίζονται μόνο όταν δημιουργείται το volume. Αν τους αλλάξεις αργότερα στο `.env`, δεν εφαρμόζονται. Πρέπει να σβήσεις το volume (βλ. παρακάτω).
 
@@ -94,7 +98,7 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 | Εντολή                                | Τι κάνει                                                 |
 | ------------------------------------- | -------------------------------------------------------- |
 | `docker compose up -d`                | Ξεκινάει όλες τις υπηρεσίες                              |
-| `docker compose up -d postgres redis` | Μόνο βάση και Redis (χωρίς geocoding)                    |
+| `docker compose up -d postgres redis rustfs-init` | Μόνο ό,τι θέλει το api (χωρίς geocoding)     |
 | `docker compose ps`                   | Κατάσταση των υπηρεσιών                                  |
 | `docker compose stop`                 | Σταματάει τις υπηρεσίες, τα δεδομένα μένουν              |
 | `docker compose down`                 | Σβήνει τα containers, τα δεδομένα (volumes) μένουν       |
@@ -107,6 +111,7 @@ Connection strings: `postgresql://geoplatform:geoplatform@localhost:5432/geoplat
 | --- | --- | --- |
 | `geoplatform_postgres-data` | Η βάση της εφαρμογής | Χάνονται όλα τα δεδομένα. Ξανατρέχεις `ace migration:run` (βλ. [DB.md](../backend/DB.md#reset-τοπικής-βάσης)) |
 | `geoplatform_redis-data` | Τα δεδομένα του Redis | Μηδενίζονται τα όρια requests |
+| `geoplatform_rustfs-data` | Τα αρχεία (S3) | Χάνονται όλα τα αρχεία. Το `rustfs-init` ξαναφτιάχνει το bucket άδειο |
 | `geoplatform_nominatim-data` | Η βάση του Nominatim | Ξανά import (~15–30 λεπτά) |
 | `geoplatform_photon-data` | Το index του Photon | Ξανά index από το Nominatim (~4 λεπτά) |
 

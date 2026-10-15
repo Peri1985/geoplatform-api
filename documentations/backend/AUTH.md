@@ -42,7 +42,7 @@
 {
   "data": {
     "user": {
-      "id": 1,
+      "id": "19753223-0a9f-471c-a0c9-e7d3648ae5e3",
       "fullName": "Maria P",
       "email": "maria@example.com",
       "createdAt": "2026-10-15T11:10:46.354+00:00",

@@ -1,6 +1,6 @@
 # Geoplatform
 
-Monorepo με npm workspaces και Turborepo: ένα backend σε AdonisJS, δύο frontends σε React και ένα κοινό πακέτο με types. Για βάση χρησιμοποιεί PostgreSQL με PostGIS, και για geocoding Nominatim και Photon.
+Monorepo με npm workspaces και Turborepo: ένα backend σε AdonisJS, δύο frontends σε React και ένα κοινό πακέτο με types. Για βάση χρησιμοποιεί PostgreSQL με PostGIS, για αρχεία S3 (RustFS τοπικά), και για geocoding Nominatim και Photon.
 
 | Φάκελος           | Πακέτο         | Τι είναι                                             | Port |
 | ----------------- | -------------- | ---------------------------------------------------- | ---- |
@@ -34,18 +34,19 @@ Monorepo με npm workspaces και Turborepo: ένα backend σε AdonisJS, δ�
 ```bash
 cp .env.example .env                              # ρυθμίσεις του Docker
 cp apps/api/.env.example apps/api/.env            # ρυθμίσεις του api (βάση, Redis)
-docker compose up -d                              # PostGIS, Redis, Nominatim, Photon
+docker compose up -d                              # PostGIS, Redis, RustFS, Nominatim, Photon
 npm install
 npm run ace -w api -- generate:key                # γεμίζει το APP_KEY στο apps/api/.env
 npm run ace -w api -- migration:run               # δημιουργεί τους πίνακες της βάσης
 npm run dev                                       # api, admin, account και shared (watch)
 ```
 
-Την πρώτη φορά, το `docker compose up -d` κάνει import τα δεδομένα OSM της Ελλάδας, που παίρνει 15–30 λεπτά (βλ. [DOCKER.md](documentations/infrastructure/DOCKER.md)). Για να δουλέψεις στο μεταξύ, αρκεί το `docker compose up -d postgres redis`.
+Την πρώτη φορά, το `docker compose up -d` κάνει import τα δεδομένα OSM της Ελλάδας, που παίρνει 15–30 λεπτά (βλ. [DOCKER.md](documentations/infrastructure/DOCKER.md)). Για να δουλέψεις στο μεταξύ, αρκεί το `docker compose up -d postgres redis rustfs-init`.
 
 Μετά το `npm run dev`:
 
 - API: http://localhost:3333/api/v1/health
+- RustFS console: http://localhost:9001
 - admin: http://localhost:5173
 - account: http://localhost:5174
 
@@ -58,7 +59,8 @@ npm run dev                                       # api, admin, account και s
 | Authentication: Bearer tokens, signup, login | [documentations/backend/AUTH.md](documentations/backend/AUTH.md) |
 | Frontends: admin, account, κλήσεις στο API, κοινά React components | [documentations/frontend/FRONTEND.md](documentations/frontend/FRONTEND.md) |
 | Κοινό πακέτο `@repo/shared`: Zod schemas και types | [documentations/shared/SHARED.md](documentations/shared/SHARED.md) |
-| Docker: PostGIS, Redis, Nominatim, Photon | [documentations/infrastructure/DOCKER.md](documentations/infrastructure/DOCKER.md) |
+| Docker: PostGIS, Redis, RustFS, Nominatim, Photon | [documentations/infrastructure/DOCKER.md](documentations/infrastructure/DOCKER.md) |
+| Αρχεία: S3, RustFS, uploads, signed URLs | [documentations/infrastructure/STORAGE.md](documentations/infrastructure/STORAGE.md) |
 
 ## Εντολές από το root
 

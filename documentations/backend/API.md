@@ -4,6 +4,7 @@
 
 - Βάση και migrations: [DB.md](DB.md)
 - Login και tokens: [AUTH.md](AUTH.md)
+- Αρχεία (S3): [STORAGE.md](../infrastructure/STORAGE.md)
 
 > [!IMPORTANT]
 > Χρειάζεται **Node 24.22 ή νεότερο** (`.nvmrc` στο root). Με το Node 24.0.0 το Adonis σκάει με `addQueryContext is not a function` μόλις ανοίξει σύνδεση με τη βάση.
@@ -25,7 +26,7 @@
 Από το root του repo:
 
 ```bash
-docker compose up -d postgres redis               # βάση και Redis (βλ. infrastructure/DOCKER.md)
+docker compose up -d postgres redis rustfs-init   # βάση, Redis, S3 (βλ. infrastructure/DOCKER.md)
 cp apps/api/.env.example apps/api/.env            # μία φορά
 npm run ace -w api -- generate:key                # μία φορά: γεμίζει το APP_KEY
 npm run ace -w api -- migration:run               # μία φορά, και μετά από κάθε νέο migration
@@ -44,7 +45,7 @@ npm run dev -w api                                # http://localhost:3333/api/v1
 | `lint` | ESLint (κανόνες του Adonis) |
 | `format` | Prettier |
 | `typecheck` | `tsc --noEmit` |
-| `test` | Όλα τα tests (Japa). Χρειάζονται βάση και Redis |
+| `test` | Όλα τα tests (Japa). Χρειάζονται βάση και Redis (όχι RustFS: τα αρχεία πάνε σε fake disk) |
 | `ace -- <εντολή>` | Οποιαδήποτε εντολή `node ace` (migrations, `make:*`) |
 
 ## Δομή
@@ -54,13 +55,13 @@ apps/api/
 ├── .env.example            # μεταβλητές περιβάλλοντος (αντιγράφεται σε .env)
 ├── adonisrc.ts             # providers, εντολές, test suites
 ├── app/
-│   ├── controllers/        # HTTP handlers, ένας ανά πόρο
+│   ├── controllers/        # HTTP handlers, ένας ανά πόρο (auth, profile, files, health)
 │   ├── exceptions/         # μετατροπή σφαλμάτων σε απαντήσεις
 │   ├── middleware/         # auth, JSON
-│   ├── models/             # Lucid models (user)
+│   ├── models/             # Lucid models (user, file)
 │   ├── transformers/       # τι επιστρέφεται από κάθε model
 │   └── validators/         # VineJS: έλεγχος body και query
-├── config/                 # ρυθμίσεις: auth, database, redis, limiter, cors...
+├── config/                 # ρυθμίσεις: auth, database, drive (S3), redis, limiter, cors...
 ├── database/
 │   ├── migrations/         # migrations της βάσης
 │   ├── schema.ts           # ΠΑΡΑΓΕΤΑΙ αυτόματα από τη βάση, μην το αλλάζεις
@@ -98,6 +99,7 @@ apps/api/
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE` | βλ. [DB.md](DB.md#σύνδεση) | Σύνδεση με τη βάση |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | `127.0.0.1`, `6379` | Σύνδεση με το Redis |
 | `LIMITER_STORE` | `redis` | Πού κρατιούνται τα όρια requests (`redis` ή `memory`) |
+| `DRIVE_DISK`, `AWS_*`, `S3_BUCKET`, `S3_ENDPOINT` | βλ. [STORAGE.md](../infrastructure/STORAGE.md#ρυθμίσεις) | Αποθήκευση αρχείων (S3) |
 | `LOG_LEVEL` | `info` | Επίπεδο logs |
 
 - Το `.env.test` υπερισχύει όταν τρέχουν τα tests (`LIMITER_STORE=memory`).
@@ -113,15 +115,19 @@ apps/api/
 | `POST` | `/api/v1/auth/login` | Δημόσιο | Login, επιστρέφει χρήστη και token |
 | `GET` | `/api/v1/account/profile` | Συνδεδεμένοι | Ο συνδεδεμένος χρήστης |
 | `POST` | `/api/v1/account/logout` | Συνδεδεμένοι | Ακυρώνει το token |
+| `GET` | `/api/v1/files` | Συνδεδεμένοι | Τα αρχεία μου, σε σελίδες (`?page=&perPage=`) |
+| `POST` | `/api/v1/files` | Συνδεδεμένοι | Ανέβασμα αρχείου (multipart, πεδίο `file`, έως 20 MB) |
+| `GET` | `/api/v1/files/:id` | Ιδιοκτήτης | Ένα αρχείο, με προσωρινό URL λήψης |
+| `DELETE` | `/api/v1/files/:id` | Ιδιοκτήτης | Διαγραφή από S3 και βάση |
 
-Λεπτομέρειες και παραδείγματα: [AUTH.md](AUTH.md).
+Λεπτομέρειες και παραδείγματα: [AUTH.md](AUTH.md) για το auth, [STORAGE.md](../infrastructure/STORAGE.md#πώς-χρησιμοποιείται-στο-api) για τα αρχεία.
 
 ## Μορφή απαντήσεων
 
 Οι επιτυχημένες απαντήσεις είναι τυλιγμένες σε `data`. Αυτό το κάνει το `ctx.serialize(...)` (`providers/api_provider.ts`):
 
 ```json
-{ "data": { "id": 1, "fullName": "Maria P", "email": "maria@example.com", "createdAt": "2026-10-15T11:10:46.354+00:00", "updatedAt": "2026-10-15T11:10:46.354+00:00", "initials": "MP" } }
+{ "data": { "id": "19753223-0a9f-471c-a0c9-e7d3648ae5e3", "fullName": "Maria P", "email": "maria@example.com", "createdAt": "2026-10-15T11:10:46.354+00:00", "updatedAt": "2026-10-15T11:10:46.354+00:00", "initials": "MP" } }
 ```
 
 Τα σφάλματα έρχονται ως λίστα `errors`:

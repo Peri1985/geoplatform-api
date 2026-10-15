@@ -39,4 +39,17 @@ export default await Env.create(new URL('../', import.meta.url), {
   |----------------------------------------------------------
   */
   LIMITER_STORE: Env.schema.enum(['redis', 'memory'] as const),
+
+  /*
+  |----------------------------------------------------------
+  | File storage (S3 or S3-compatible, e.g. RustFS)
+  |----------------------------------------------------------
+  */
+  DRIVE_DISK: Env.schema.enum(['s3'] as const),
+  AWS_ACCESS_KEY_ID: Env.schema.string(),
+  AWS_SECRET_ACCESS_KEY: Env.schema.secret(),
+  AWS_REGION: Env.schema.string(),
+  S3_BUCKET: Env.schema.string(),
+  // Only for S3-compatible storage (RustFS, R2, ...); empty for AWS S3
+  S3_ENDPOINT: Env.schema.string.optional({ format: 'url', tld: false }),
 })

@@ -61,6 +61,7 @@ export default class User extends compose(UserSchema, withAuthFinder(hash)) {
 ```
 
 - Τα ονόματα των στηλών στη βάση είναι `snake_case` (`full_name`), και στον κώδικα `camelCase` (`fullName`). Η μετατροπή γίνεται αυτόματα.
+- **Όλα τα ids είναι UUID** (`string` στον κώδικα), που τα παράγει η βάση με `gen_random_uuid()`. Δεν χρειάζεται να δώσεις id στο `create()`: το Lucid το διαβάζει πίσω από τη βάση.
 - Όταν ο παραγόμενος τύπος μιας στήλης δεν είναι σωστός (π.χ. `any` για ένα enum), τον διορθώνεις στο `database/schema_rules.ts`, όχι στο `schema.ts`:
 
   ```ts
@@ -121,7 +122,7 @@ export default class User extends compose(UserSchema, withAuthFinder(hash)) {
    ```ts
    async up() {
      this.schema.createTable(this.tableName, (table) => {
-       table.increments('id')
+       table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))
        table.string('name', 100).notNullable().unique()
        table.timestamp('created_at', { useTz: true }).notNullable()
        table.timestamp('updated_at', { useTz: true }).nullable()
@@ -173,14 +174,14 @@ async down() {
 
 | Μέθοδος | Τύπος PostgreSQL |
 | --- | --- |
-| `table.increments('id')` | `serial` primary key |
+| `table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))` | `uuid` primary key. **Έτσι γράφονται όλα τα ids** |
 | `table.string('name', 200)` | `varchar(200)` |
 | `table.text('notes')` | `text` |
 | `table.integer('count')` | `integer` |
 | `table.boolean('is_active').defaultTo(true)` | `boolean` |
 | `table.timestamp('created_at', { useTz: true })` | `timestamptz` (χρησιμοποίησε πάντα `useTz`) |
 | `table.enu('status', ['a', 'b'], { useNative: true, enumName: 'x_status' })` | enum |
-| `table.integer('user_id').references('id').inTable('users').onDelete('CASCADE')` | foreign key |
+| `table.uuid('user_id').references('id').inTable('users').onDelete('CASCADE')` | foreign key (UUID, όπως τα ids) |
 | `table.specificType('location', 'geometry(Point, 4326)')` | Ό,τι δεν έχει έτοιμη μέθοδο (π.χ. PostGIS) |
 | `this.schema.raw('...')` | Οποιοδήποτε SQL (extensions, indexes, views) |
 
@@ -264,11 +265,14 @@ static withinRadius = scope((query, { lat, lon, radius }: { lat: number; lon: nu
 | Πίνακας | Migration | Τι κρατάει |
 | --- | --- | --- |
 | `users` | [create_users_table](../../apps/api/database/migrations/1761885935168_create_users_table.ts) | Χρήστες: όνομα, email (μοναδικό, πεζά), hash κωδικού (scrypt) |
+| `files` | [create_files_table](../../apps/api/database/migrations/1792070000000_create_files_table.ts) | Τα αρχεία στο S3: key, όνομα, τύπος, μέγεθος, ιδιοκτήτης (`owner_id` → `users`, `CASCADE`), και πολυμορφική σύνδεση (`attachable_type`, `attachable_id`, χωρίς foreign key). Βλ. [STORAGE.md](../infrastructure/STORAGE.md#ο-πίνακας-files-πολυμορφικός) |
 | `auth_access_tokens` | [create_access_tokens_table](../../apps/api/database/migrations/1768620764696_create_access_tokens_table.ts) | Τα access tokens (μόνο το hash τους), με λήξη. Σβήνονται μαζί με τον χρήστη. Βλ. [AUTH.md](AUTH.md) |
 | `adonis_schema`, `adonis_schema_versions` | Lucid | Ποια migrations έχουν τρέξει. Μην τα αλλάζεις με το χέρι |
 | `spatial_ref_sys` | PostGIS | Τα συστήματα συντεταγμένων. Μην τον αλλάζεις |
 
 Extensions: `postgis` (από το migration [enable_postgis](../../apps/api/database/migrations/1761885935000_enable_postgis.ts)). Το docker image προσθέτει επίσης `postgis_topology`, `postgis_tiger_geocoder` και `fuzzystrmatch`. Γι' αυτό το `down` του `enable_postgis` δεν σβήνει το PostGIS: τα άλλα extensions εξαρτώνται από αυτό.
+
+Όλα τα ids είναι UUID, με default `gen_random_uuid()`.
 
 Ενημέρωνε αυτόν τον πίνακα όταν προσθέτεις πίνακα.
 

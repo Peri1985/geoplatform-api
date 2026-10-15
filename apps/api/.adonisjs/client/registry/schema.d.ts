@@ -67,4 +67,52 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/access_tokens_controller').default['destroy']>>>
     }
   }
+  'files.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/files'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: ExtractQueryForGet<InferInput<(typeof import('#validators/file').listFilesValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/files_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/files_controller').default['index']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'files.store': {
+    methods: ["POST"]
+    pattern: '/api/v1/files'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/file').uploadFileValidator)>>
+      paramsTuple: []
+      params: {}
+      query: ExtractQuery<InferInput<(typeof import('#validators/file').uploadFileValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/files_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/files_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'files.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/files/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/files_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/files_controller').default['show']>>>
+    }
+  }
+  'files.destroy': {
+    methods: ["DELETE"]
+    pattern: '/api/v1/files/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/files_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/files_controller').default['destroy']>>>
+    }
+  }
 }
