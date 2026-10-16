@@ -1,11 +1,12 @@
 # Backend (API)
 
-Το backend είναι εφαρμογή [AdonisJS](https://docs.adonisjs.com) 7 στο `apps/api`. Είναι γραμμένο σε TypeScript 6 ως ESM, και όλα τα routes είναι κάτω από το `/api/v1`. Ξεκίνησε από το επίσημο API starter kit, προσαρμοσμένο σε PostgreSQL, χωρίς sessions και cookies.
+Το backend είναι εφαρμογή [AdonisJS](https://docs.adonisjs.com) 7 στο `apps/api`. Είναι γραμμένο σε TypeScript 6 ως ESM, και όλα τα routes είναι κάτω από το `/v1`. Ξεκίνησε από το επίσημο API starter kit, προσαρμοσμένο σε PostgreSQL, χωρίς sessions και cookies.
 
 - Βάση και migrations: [DB.md](DB.md)
 - Login και tokens: [AUTH.md](AUTH.md)
 - Αρχεία (S3): [STORAGE.md](../infrastructure/STORAGE.md)
 - Audit log: [AUDIT.md](AUDIT.md)
+- Τεκμηρίωση OpenAPI (`/docs`): [OPENAPI.md](OPENAPI.md)
 
 > [!IMPORTANT]
 > Χρειάζεται **Node 24.22 ή νεότερο** (`.nvmrc` στο root). Με το Node 24.0.0 το Adonis σκάει με `addQueryContext is not a function` μόλις ανοίξει σύνδεση με τη βάση.
@@ -19,6 +20,7 @@
 - [Μορφή απαντήσεων](#μορφή-απαντήσεων)
 - [Νέα λειτουργία, βήμα-βήμα](#νέα-λειτουργία-βήμα-βήμα)
 - [Validation](#validation)
+- [Φίλτρα](#φίλτρα)
 - [Tests](#tests)
 - [Κανόνες κώδικα](#κανόνες-κώδικα)
 
@@ -31,7 +33,7 @@ docker compose up -d postgres redis rustfs-init   # βάση, Redis, S3 (βλ. i
 cp apps/api/.env.example apps/api/.env            # μία φορά
 npm run ace -w api -- generate:key                # μία φορά: γεμίζει το APP_KEY
 npm run ace -w api -- migration:run               # μία φορά, και μετά από κάθε νέο migration
-npm run dev -w api                                # http://localhost:3333/api/v1/health
+npm run dev -w api                                # http://localhost:3333/v1/health
 ```
 
 Ή `npm run dev` από το root, για να σηκωθούν μαζί και τα frontends.
@@ -48,6 +50,7 @@ npm run dev -w api                                # http://localhost:3333/api/v1
 | `typecheck` | `tsc --noEmit` |
 | `test` | Όλα τα tests (Japa). Χρειάζονται βάση και Redis (όχι RustFS: τα αρχεία πάνε σε fake disk) |
 | `ace -- <εντολή>` | Οποιαδήποτε εντολή `node ace` (migrations, `make:*`) |
+| `ace -- docs:generate` | Ξαναπαράγει το έγγραφο OpenAPI του `/docs` (συνήθως γίνεται μόνο του, βλ. [OPENAPI.md](OPENAPI.md)) |
 
 ## Δομή
 
@@ -116,15 +119,39 @@ apps/api/
 
 | Method | Path | Ποιος | Τι κάνει |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/health` | Δημόσιο | `{ "status": "ok" }` |
-| `POST` | `/api/v1/auth/signup` | Δημόσιο | Εγγραφή, επιστρέφει χρήστη και token |
-| `POST` | `/api/v1/auth/login` | Δημόσιο | Login, επιστρέφει χρήστη και token |
-| `GET` | `/api/v1/account/profile` | Συνδεδεμένοι | Ο συνδεδεμένος χρήστης |
-| `POST` | `/api/v1/account/logout` | Συνδεδεμένοι | Ακυρώνει το token |
-| `GET` | `/api/v1/files` | Συνδεδεμένοι | Τα αρχεία μου, σε σελίδες (`?page=&perPage=`) |
-| `POST` | `/api/v1/files` | Συνδεδεμένοι | Ανέβασμα αρχείου (multipart, πεδίο `file`, έως 20 MB) |
-| `GET` | `/api/v1/files/:id` | Ιδιοκτήτης | Ένα αρχείο, με προσωρινό URL λήψης |
-| `DELETE` | `/api/v1/files/:id` | Ιδιοκτήτης | Διαγραφή από S3 και βάση |
+| `GET` | `/v1/health` | Δημόσιο | `{ "status": "ok" }` |
+| `POST` | `/v1/auth/signup` | Δημόσιο | Εγγραφή, επιστρέφει χρήστη και token |
+| `POST` | `/v1/auth/login` | Δημόσιο | Login, επιστρέφει χρήστη και token |
+| `GET` | `/v1/account/profile` | Συνδεδεμένοι | Ο συνδεδεμένος χρήστης |
+| `POST` | `/v1/account/logout` | Συνδεδεμένοι | Ακυρώνει το token |
+| `GET` | `/v1/files` | Συνδεδεμένοι | Τα αρχεία μου, σε σελίδες (`?page=`) |
+| `POST` | `/v1/files` | Συνδεδεμένοι | Ανέβασμα αρχείου (multipart, πεδίο `file`, έως 20 MB) |
+| `GET` | `/v1/files/:id` | Ιδιοκτήτης | Ένα αρχείο, με προσωρινό URL λήψης |
+| `DELETE` | `/v1/files/:id` | Ιδιοκτήτης | Διαγραφή από S3 και βάση |
+| `GET` | `/v1/organizations` | Συνδεδεμένοι | Οι οργανισμοί, σε σελίδες (`?page=`) |
+| `POST` | `/v1/organizations` | Συνδεδεμένοι | Νέος οργανισμός· ο δημιουργός γίνεται `admin` |
+| `GET` | `/v1/organizations/:id` | Συνδεδεμένοι | Ένας οργανισμός |
+| `PUT` / `PATCH` | `/v1/organizations/:id` | Συνδεδεμένοι | Αλλαγή στοιχείων ή `status` (`suspended` → `suspendedAt`) |
+| `DELETE` | `/v1/organizations/:id` | Συνδεδεμένοι | Διαγραφή, μαζί με μέλη, συνδρομές, keys και χρήση |
+| `GET` | `/v1/organizations/:organizationId/members` | Συνδεδεμένοι | Τα μέλη, με τον χρήστη |
+| `POST` | `/v1/organizations/:organizationId/members` | Συνδεδεμένοι | Προσθήκη χρήστη (`userId`, `role`), μία φορά ανά οργανισμό |
+| `GET / PUT / PATCH / DELETE` | `/v1/organizations/:organizationId/members/:id` | Συνδεδεμένοι | Ένα μέλος / αλλαγή `role`, `status` / αφαίρεση |
+| `GET / POST` | `/v1/geocoding/plans` | Συνδεδεμένοι | Τα πακέτα / νέο πακέτο (`code` μοναδικό) |
+| `GET / PUT / PATCH` | `/v1/geocoding/plans/:id` | Συνδεδεμένοι | Ένα πακέτο / αλλαγή (όχι του `code`) |
+| `DELETE` | `/v1/geocoding/plans/:id` | Συνδεδεμένοι | Διαγραφή, μόνο χωρίς συνδρομές (αλλιώς `409`) |
+| `GET` | `/v1/geocoding/organizations/:organizationId/subscriptions` | Συνδεδεμένοι | Όλες οι συνδρομές, νεότερη πρώτη, με το πακέτο |
+| `POST` | `/v1/geocoding/organizations/:organizationId/subscriptions` | Συνδεδεμένοι | Συνδρομή σε πακέτο (`planId`)· η ενεργή λήγει πρώτα (αλλαγή πακέτου) |
+| `GET / DELETE` | `/v1/geocoding/organizations/:organizationId/subscriptions/:id` | Συνδεδεμένοι | Μία συνδρομή / ακύρωση (`endsAt` = τώρα) |
+| `GET` | `/v1/geocoding/organizations/:organizationId/api-keys` | Συνδεδεμένοι | Τα API keys (ποτέ το hash) |
+| `POST` | `/v1/geocoding/organizations/:organizationId/api-keys` | Συνδεδεμένοι | Νέο key· η απάντηση έχει το `key` **μόνο αυτή τη φορά** |
+| `GET / PUT / PATCH` | `/v1/geocoding/organizations/:organizationId/api-keys/:id` | Συνδεδεμένοι | Ένα key / αλλαγή ονόματος, περιορισμών, λήξης |
+| `DELETE` | `/v1/geocoding/organizations/:organizationId/api-keys/:id` | Συνδεδεμένοι | Ανάκληση (`revokedAt`)· η γραμμή μένει |
+| `GET` | `/v1/geocoding/organizations/:organizationId/usage` | Συνδεδεμένοι | Οι κλήσεις, σε σελίδες (`?page=&apiKeyId=`) |
+| `GET` | `/v1/geocoding/organizations/:organizationId/usage/daily` | Συνδεδεμένοι | Κλήσεις ανά μέρα (`?from=YYYY-MM-DD&to=YYYY-MM-DD`) |
+| `GET` | `/v1/geocoding/organizations/:organizationId/usage/monthly` | Συνδεδεμένοι | Κλήσεις ανά μήνα |
+
+> [!WARNING]
+> Προς το παρόν, **κάθε συνδεδεμένος χρήστης** έχει πρόσβαση σε όλους τους οργανισμούς και τα πακέτα. Οι έλεγχοι ρόλων (μέλος του οργανισμού, `admin`, admin της πλατφόρμας) θα προστεθούν αργότερα.
 
 Λεπτομέρειες και παραδείγματα: [AUTH.md](AUTH.md) για το auth, [STORAGE.md](../infrastructure/STORAGE.md#πώς-χρησιμοποιείται-στο-api) για τα αρχεία.
 
@@ -202,17 +229,18 @@ apps/api/
 
    ```ts
    router
-     .group(() => {
-       router.get('/', [controllers.Categories, 'index']).as('index')
-       router.post('/', [controllers.Categories, 'store']).as('store')
-     })
-     .prefix('categories')
-     .as('categories')
+     .resource('categories', controllers.Categories)
+     .apiOnly()
+     .where('id', router.matchers.uuid())
    ```
+
+   Το `router.resource` φτιάχνει μαζί τα `index` (`GET /categories`), `store` (`POST`), `show` (`GET /:id`), `update` (`PUT` **και** `PATCH /:id`) και `destroy` (`DELETE /:id`), με ονόματα `categories.index` κ.λπ. Το `apiOnly()` αφήνει έξω τα `create`/`edit`, που είναι σελίδες με φόρμες. Αν ο controller δεν έχει κάποιο action: `.except(['update'])`. Ό,τι δεν είναι CRUD (π.χ. `/usage/daily`) γράφεται με `router.get(...)`.
 
 5. **Audit:** αν οι αλλαγές πρέπει να καταγράφονται, πρόσθεσε το `withAudit()` στο model (βλ. [AUDIT.md](AUDIT.md#audit-σε-νέο-model)).
 
 6. **Tests** στο `tests/functional/categories.spec.ts`.
+
+7. **Τεκμηρίωση:** τα νέα endpoints μπαίνουν μόνα τους στο `/docs`. Γράψε ένα σχόλιο `/** */` πάνω από κάθε μέθοδο του controller για την περιγραφή (βλ. [OPENAPI.md](OPENAPI.md#περιγραφές-τα-σχόλια-των-controllers)).
 
 > [!IMPORTANT]
 > Στο Adonis ένα route είναι **ανοιχτό**, εκτός αν μπει σε group με `middleware.auth()`. Βάζε κάθε νέο route που θέλει login μέσα στο υπάρχον group του `start/routes.ts`.
@@ -239,6 +267,44 @@ const { email, password } = await request.validateUsing(loginValidator)
 
 Τα frontends μπορούν να ελέγχουν τις φόρμες με Zod schemas στο `@repo/shared` (βλ. [SHARED.md](../shared/SHARED.md)). Αν αλλάξεις έναν κανόνα (π.χ. μέγιστο μήκος), άλλαξέ τον και στα δύο σημεία.
 
+## Φίλτρα
+
+Οι λίστες φιλτράρονται από το query string, π.χ. `GET /v1/organizations?search=acme&status=active`. Κάθε model έχει μια κλάση φίλτρου στο `app/filters/<model>_filter.ts`, με **μία μέθοδο ανά φίλτρο**:
+
+```ts
+// app/filters/organization_filter.ts
+export default class OrganizationFilter extends BaseFilter {
+  search(value: string) {
+    this.query.whereILike('name', `%${value}%`)
+  }
+
+  status(value: 'active' | 'suspended') {
+    this.query.where('status', value)
+  }
+}
+```
+
+Το model το παίρνει με το mixin `withFilters()` ([app/mixins/with_filters.ts](../../apps/api/app/mixins/with_filters.ts)), και αποκτά το `Model.filter(input)`:
+
+```ts
+// app/models/organization.ts
+export default class Organization extends compose(OrganizationSchema, withAudit(), withFilters(filters.Organization)) {}
+
+// στον controller: πρώτα validation, μετά φίλτρα, μετά ό,τι άλλο χρειάζεται
+const { page = 1, ...input } = await request.validateUsing(listOrganizationsValidator)
+const organizations = await Organization.filter(input)
+  .orderBy(...this.orderBy)
+  .paginate(page, paginationConfig.perPage)
+```
+
+- Για κάθε κλειδί του `input` καλείται η μέθοδος με το ίδιο όνομα. Κλειδιά χωρίς μέθοδο αγνοούνται, και κενές τιμές (`''`, `null`, `undefined`) δεν φιλτράρουν.
+- Το `filter()` επιστρέφει το query, οπότε ακολουθούν `where`, `preload`, `orderBy`, `paginate`.
+- **Πάντα πρώτα validator:** κάθε φίλτρο έχει πεδίο στον validator της λίστας (π.χ. `listOrganizationsValidator`). Έτσι μια λάθος τιμή απαντάει `422`, αντί να φτάσει στη βάση, και οι τιμές έχουν σωστό τύπο (`?isActive=true` → `true`, ημερομηνίες → `DateTime`).
+
+**Σελίδες και σειρά:** το μέγεθος σελίδας είναι ίδιο σε όλες τις λίστες, στο [config/pagination.ts](../../apps/api/config/pagination.ts) (`perPage`). Ο client διαλέγει μόνο τη σελίδα (`?page=2`). Η σειρά ορίζεται σε κάθε controller, στη μεταβλητή `orderBy`, π.χ. `private orderBy = ['name', 'asc'] as const`, και χρησιμοποιείται ως `.orderBy(...this.orderBy)`.
+
+**Νέο φίλτρο:** φτιάχνεις το `app/filters/<model>_filter.ts` και τρέχεις `npm run dev` ή `npm run build -w api`. Το Adonis το προσθέτει μόνο του στο `#generated/filters` (`.adonisjs/server/filters.ts`), με κλειδί το όνομα του αρχείου χωρίς το `_filter` (`geocoding_api_key_filter.ts` → `filters.GeocodingApiKey`). Το barrel ορίζεται στο hook `init` του `adonisrc.ts`, όπως αυτά των controllers.
+
 ## Tests
 
 Τα tests είναι γραμμένα με [Japa](https://japa.dev), το test framework του Adonis:
@@ -260,7 +326,7 @@ npm run ace -w api -- test --files=auth       # ένα αρχείο
 
 ```ts
 const user = await createUser()
-const response = await client.get('/api/v1/account/profile').loginAs(user)
+const response = await client.get('/v1/account/profile').loginAs(user)
 response.assertStatus(200)
 ```
 

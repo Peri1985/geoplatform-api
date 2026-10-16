@@ -14,13 +14,17 @@ export default class extends BaseSchema {
       table.string('mime_type', 255).notNullable()
       table.integer('size').notNullable()
 
-      // Who the file belongs to: the files list of a user
+      // Who the file belongs to: a user or an organization. No foreign key: it points
+      // to different tables (UUIDs are unique across tables)
+      table.uuid('owner_id').notNullable().index()
+
+      // Who uploaded the file, whoever owns it
       table
-        .uuid('owner_id')
-        .notNullable()
+        .uuid('uploaded_by')
+        .nullable()
         .references('id')
         .inTable('users')
-        .onDelete('CASCADE')
+        .onDelete('SET NULL')
         .index()
 
       // What the file is attached to, if anything (polymorphic): the table name of the

@@ -10,6 +10,13 @@ export default class extends BaseSchema {
       table.string('full_name').nullable()
       table.string('email', 254).notNullable().unique()
       table.string('password').notNullable()
+      // Staff of our company: full control of the platform, outside any organization
+      table.string('type').notNullable().defaultTo('admin')
+      table.string('locale', 5).notNullable().defaultTo('el')
+      // Encrypted by the app before saving
+      table.text('two_factor_secret').nullable()
+      table.text('two_factor_recovery_codes').nullable()
+      table.boolean('two_factor_enabled').notNullable().defaultTo(false)
 
       table.timestamp('created_at', { useTz: true }).notNullable()
       table.timestamp('updated_at', { useTz: true }).nullable()

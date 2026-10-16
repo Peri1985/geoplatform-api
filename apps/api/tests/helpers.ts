@@ -20,7 +20,7 @@ export function createUser() {
  * Logs in through the API and returns the "Authorization" header value
  */
 export async function login(client: ApiClient, user: User) {
-  const response = await client.post('/api/v1/auth/login').json({ email: user.email, password })
+  const response = await client.post('/v1/auth/login').json({ email: user.email, password })
   response.assertStatus(200)
   const { token } = response.body().data
   return `Bearer ${token}`

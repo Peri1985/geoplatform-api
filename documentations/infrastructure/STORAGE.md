@@ -116,13 +116,13 @@ S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 
 | Method | Path | Τι κάνει |
 | --- | --- | --- |
-| `GET` | `/api/v1/files?page=1&perPage=20` | Τα αρχεία μου, νεότερα πρώτα, σε σελίδες (`perPage` έως 100) |
-| `POST` | `/api/v1/files` | Ανέβασμα (multipart, πεδίο `file`). Επιστρέφει το αρχείο και `url` |
-| `GET` | `/api/v1/files/:id` | Ένα αρχείο μου, με νέο `url` |
-| `DELETE` | `/api/v1/files/:id` | Διαγραφή από το S3 **και** από τη βάση (`204`) |
+| `GET` | `/v1/files?page=1` | Τα αρχεία μου, νεότερα πρώτα, σε σελίδες (μέγεθος σελίδας: `config/pagination.ts`) |
+| `POST` | `/v1/files` | Ανέβασμα (multipart, πεδίο `file`). Επιστρέφει το αρχείο και `url` |
+| `GET` | `/v1/files/:id` | Ένα αρχείο μου, με νέο `url` |
+| `DELETE` | `/v1/files/:id` | Διαγραφή από το S3 **και** από τη βάση (`204`) |
 
 ```bash
-curl -X POST http://localhost:3333/api/v1/files \
+curl -X POST http://localhost:3333/v1/files \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@port.geojson"
 ```
@@ -136,6 +136,7 @@ curl -X POST http://localhost:3333/api/v1/files \
       "mimeType": "application/geo+json",
       "size": 45,
       "ownerId": "19753223-0a9f-471c-a0c9-e7d3648ae5e3",
+      "uploadedBy": "19753223-0a9f-471c-a0c9-e7d3648ae5e3",
       "attachableType": null,
       "attachableId": null,
       "createdAt": "2026-10-15T12:15:00.137+00:00",
@@ -158,7 +159,7 @@ curl -X POST http://localhost:3333/api/v1/files \
 - **Όρια:** έως 20 MB, και μόνο οι καταλήξεις `jpg`, `jpeg`, `png`, `webp`, `pdf`, `csv`, `json`, `geojson`, `kml`, `gpx`, `zip`, `tif`, `tiff`. Αλλιώς `422`. Η λίστα, μαζί με τον MIME type κάθε κατάληξης, είναι στο [app/validators/file.ts](../../apps/api/app/validators/file.ts).
 - **Ο MIME type βγαίνει από την κατάληξη,** όχι από ό,τι δηλώνει ο client.
 - **Το key στο S3 δεν περιέχει το αρχικό όνομα,** για να μη συγκρούονται αρχεία με το ίδιο όνομα και για να μη μπορεί να μαντέψει κανείς keys. Το key δεν επιστρέφεται στον client. Ο client χρησιμοποιεί το `id`.
-- **Κράτα το `id`, όχι το `url`:** το `url` λήγει. Όποτε χρειάζεσαι νέο, `GET /api/v1/files/:id`.
+- **Κράτα το `id`, όχι το `url`:** το `url` λήγει. Όποτε χρειάζεσαι νέο, `GET /v1/files/:id`.
 - **Audit:** upload, διαγραφή και κάθε έκδοση URL λήψης καταγράφονται στο audit log, με τον χρήστη και την IP (βλ. [AUDIT.md](../backend/AUDIT.md)).
 - **Διαγραφή:** σβήνει πρώτα το αντικείμενο από το S3 και μετά την εγγραφή. Αν αποτύχει το S3, δεν σβήνεται τίποτα, οπότε δεν μένει ποτέ εγγραφή που δείχνει σε αρχείο που λείπει. Αντίστοιχα, αν αποτύχει η εγγραφή μετά από upload, το αρχείο σβήνεται από το S3.
 
@@ -169,10 +170,13 @@ curl -X POST http://localhost:3333/api/v1/files \
 | `id` | UUID |
 | `key` | Πού είναι στο S3 (μοναδικό) |
 | `name`, `mime_type`, `size` | Αρχικό όνομα, τύπος, μέγεθος σε bytes |
-| `owner_id` | Ο χρήστης στον οποίο ανήκει (foreign key, `CASCADE`) |
-| `attachable_type`, `attachable_id` | Σε ποια εγγραφή είναι συνδεδεμένο, αν είναι: ο **πίνακας** της εγγραφής (π.χ. `users`) και το id της |
+| `owner_id` | **Σε ποιον ανήκει**: το UUID ενός χρήστη **ή** ενός οργανισμού. Από αυτό βγαίνει η λίστα. **Δεν** είναι foreign key, γιατί δείχνει σε δύο πίνακες. Τα UUID είναι μοναδικά σε όλη τη βάση, οπότε δεν μπερδεύονται |
+| `uploaded_by` | **Ποιος το ανέβασε**: πάντα χρήστης (foreign key, γίνεται `NULL` αν σβηστεί ο χρήστης) |
+| `attachable_type`, `attachable_id` | Σε ποια εγγραφή είναι συνδεδεμένο, αν είναι: ο **πίνακας** της εγγραφής (π.χ. `geocoding.geocoding_api_keys`) και το id της |
 
-Το **`owner_id`** λέει σε ποιον ανήκει το αρχείο, και από αυτό βγαίνει η λίστα. Το **`attachable_*`** λέει σε τι χρησιμοποιείται. Ένα αρχείο μπορεί να ανέβει πριν συνδεθεί κάπου, και μετά να συνδεθεί με οποιονδήποτε πίνακα, χωρίς νέα στήλη για αρχεία σε κάθε πίνακα.
+Για προσωπικά αρχεία, `owner_id` και `uploaded_by` είναι ο ίδιος χρήστης. Για αρχεία οργανισμού, `owner_id` είναι ο οργανισμός και `uploaded_by` το μέλος που τα ανέβασε. Προς το παρόν το upload φτιάχνει μόνο προσωπικά αρχεία. Τα αρχεία οργανισμού θα έρθουν με το middleware που βρίσκει τον τρέχοντα οργανισμό.
+
+Το model `File` δεν έχει σχέσεις (`belongsTo`) για ιδιοκτήτη και uploader: χρησιμοποιεί τα ids και τα scopes.
 
 Το Lucid δεν έχει έτοιμες πολυμορφικές σχέσεις, οπότε η σύνδεση γίνεται με μεθόδους του [File](../../apps/api/app/models/file.ts):
 
@@ -186,7 +190,7 @@ await file.detach()
 // όλα τα αρχεία μιας εγγραφής
 const files = await File.query().withScopes((scopes) => scopes.attachedTo(project))
 
-// τα αρχεία ενός χρήστη
+// τα αρχεία ενός χρήστη ή ενός οργανισμού
 const mine = await File.query().withScopes((scopes) => scopes.ownedBy(user))
 
 // URL λήψης και διαγραφή
@@ -205,7 +209,13 @@ await file.deleteWithObject()       // από το S3 και από τη βάσ�
 >
 > Αλλιώς τα αρχεία μένουν συνδεδεμένα σε εγγραφή που δεν υπάρχει.
 
-Όταν σβήνεται ένας χρήστης, οι εγγραφές των αρχείων του σβήνονται αυτόματα (`CASCADE`), αλλά τα αντικείμενα στο S3 **όχι**. Μια μελλοντική διαγραφή χρήστη πρέπει να κάνει πρώτα `deleteWithObject()` για κάθε αρχείο του.
+Επειδή το `owner_id` δεν είναι foreign key, **όταν σβήνεται ένας χρήστης ή ένας οργανισμός, τα αρχεία του δεν σβήνονται**, ούτε από τη βάση ούτε από το S3. Η διαγραφή χρήστη ή οργανισμού (π.χ. GDPR) πρέπει να τα σβήνει η ίδια, **πριν** από τον χρήστη ή τον οργανισμό:
+
+```ts
+const files = await File.query().withScopes((scopes) => scopes.ownedBy(organization))
+for (const file of files) await file.deleteWithObject()
+await organization.delete()
+```
 
 ### Απευθείας με το drive
 

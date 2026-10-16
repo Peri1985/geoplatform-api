@@ -8,7 +8,11 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     proxy: {
-      '/api': 'http://localhost:3333',
+      // /api/v1/health -> http://localhost:3333/v1/health
+      '/api': {
+        target: 'http://localhost:3333',
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
 })

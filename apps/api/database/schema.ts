@@ -6,6 +6,7 @@
 
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DateTime } from 'luxon'
+import { jsonColumn } from '#decorators/json_column'
 
 export class AuditLogSchema extends BaseModel {
   static $columns = ['action', 'changes', 'createdAt', 'id', 'ip', 'requestId', 'subjectId', 'subjectType', 'userAgent', 'userId'] as const
@@ -58,7 +59,7 @@ export class AuthAccessTokenSchema extends BaseModel {
 }
 
 export class FileSchema extends BaseModel {
-  static $columns = ['attachableId', 'attachableType', 'createdAt', 'id', 'key', 'mimeType', 'name', 'ownerId', 'size', 'updatedAt'] as const
+  static $columns = ['attachableId', 'attachableType', 'createdAt', 'id', 'key', 'mimeType', 'name', 'ownerId', 'size', 'updatedAt', 'uploadedBy'] as const
   $columns = FileSchema.$columns
   @column()
   declare attachableId: string | null
@@ -80,50 +81,192 @@ export class FileSchema extends BaseModel {
   declare size: number
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+  @column()
+  declare uploadedBy: string | null
 }
 
-export class GroupUserSchema extends BaseModel {
-  static $columns = ['groupId', 'userId'] as const
-  $columns = GroupUserSchema.$columns
+export class GeocodingApiKeySchema extends BaseModel {
+  static $columns = ['allowedDomains', 'allowedIps', 'createdAt', 'createdById', 'environment', 'expiresAt', 'id', 'keyHash', 'lastUsedAt', 'name', 'organizationId', 'prefix', 'revokedAt', 'updatedAt'] as const
+  $columns = GeocodingApiKeySchema.$columns
+  @jsonColumn()
+  declare allowedDomains: string[]
+  @jsonColumn()
+  declare allowedIps: string[]
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
   @column()
-  declare groupId: string
+  declare createdById: string | null
   @column()
-  declare userId: string
+  declare environment: 'production' | 'test'
+  @column.dateTime()
+  declare expiresAt: DateTime | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare keyHash: string
+  @column.dateTime()
+  declare lastUsedAt: DateTime | null
+  @column()
+  declare name: string
+  @column()
+  declare organizationId: string
+  @column()
+  declare prefix: string
+  @column.dateTime()
+  declare revokedAt: DateTime | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
 }
 
-export class GroupSchema extends BaseModel {
-  static $columns = ['createdAt', 'id', 'name', 'updatedAt'] as const
-  $columns = GroupSchema.$columns
+export class GeocodingApiUsageSchema extends BaseModel {
+  static $columns = ['apiKeyId', 'billable', 'createdAt', 'endpoint', 'id', 'organizationId', 'responseMs', 'resultCount', 'statusCode'] as const
+  $columns = GeocodingApiUsageSchema.$columns
+  @column()
+  declare apiKeyId: string | null
+  @column()
+  declare billable: boolean
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column()
+  declare endpoint: string
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare organizationId: string
+  @column()
+  declare responseMs: number
+  @column()
+  declare resultCount: number
+  @column()
+  declare statusCode: number
+}
+
+export class GeocodingApiUsageDailySchema extends BaseModel {
+  static $columns = ['calls', 'createdAt', 'date', 'id', 'organizationId', 'updatedAt'] as const
+  $columns = GeocodingApiUsageDailySchema.$columns
+  @column()
+  declare calls: number
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column.date()
+  declare date: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare organizationId: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+}
+
+export class GeocodingApiUsageMonthlySchema extends BaseModel {
+  static $columns = ['calls', 'createdAt', 'id', 'organizationId', 'period', 'updatedAt'] as const
+  $columns = GeocodingApiUsageMonthlySchema.$columns
+  @column()
+  declare calls: number
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
   @column({ isPrimary: true })
   declare id: string
   @column()
-  declare name: string
+  declare organizationId: string
+  @column()
+  declare period: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 }
 
-export class RoleUserSchema extends BaseModel {
-  static $columns = ['roleId', 'userId'] as const
-  $columns = RoleUserSchema.$columns
+export class GeocodingPlanSchema extends BaseModel {
+  static $columns = ['code', 'createdAt', 'id', 'isActive', 'monthlyQuota', 'name', 'priceMonthly', 'ratePerSecond', 'updatedAt'] as const
+  $columns = GeocodingPlanSchema.$columns
   @column()
-  declare roleId: string
+  declare code: string
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare isActive: boolean
+  @column()
+  declare monthlyQuota: number | null
+  @column()
+  declare name: string
+  @column()
+  declare priceMonthly: string
+  @column()
+  declare ratePerSecond: number | null
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+}
+
+export class GeocodingSubscriptionSchema extends BaseModel {
+  static $columns = ['createdAt', 'endsAt', 'id', 'organizationId', 'planId', 'startsAt', 'updatedAt'] as const
+  $columns = GeocodingSubscriptionSchema.$columns
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column.dateTime()
+  declare endsAt: DateTime | null
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare organizationId: string
+  @column()
+  declare planId: string
+  @column.dateTime()
+  declare startsAt: DateTime
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+}
+
+export class OrganizationMemberSchema extends BaseModel {
+  static $columns = ['createdAt', 'id', 'organizationId', 'role', 'status', 'updatedAt', 'userId'] as const
+  $columns = OrganizationMemberSchema.$columns
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+  @column({ isPrimary: true })
+  declare id: string
+  @column()
+  declare organizationId: string
+  @column()
+  declare role: 'admin' | 'member' | 'guest'
+  @column()
+  declare status: 'active' | 'disabled'
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
   @column()
   declare userId: string
 }
 
-export class RoleSchema extends BaseModel {
-  static $columns = ['id', 'name', 'role', 'sector'] as const
-  $columns = RoleSchema.$columns
+export class OrganizationSchema extends BaseModel {
+  static $columns = ['billingAddress', 'billingEmail', 'createdAt', 'id', 'legalName', 'locale', 'name', 'status', 'stripeCustomerId', 'suspendedAt', 'taxOffice', 'timezone', 'updatedAt', 'vatNumber'] as const
+  $columns = OrganizationSchema.$columns
+  @column()
+  declare billingAddress: string | null
+  @column()
+  declare billingEmail: string | null
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
   @column({ isPrimary: true })
   declare id: string
   @column()
+  declare legalName: string | null
+  @column()
+  declare locale: string
+  @column()
   declare name: string
   @column()
-  declare role: string
+  declare status: 'active' | 'suspended'
   @column()
-  declare sector: string
+  declare stripeCustomerId: string | null
+  @column.dateTime()
+  declare suspendedAt: DateTime | null
+  @column()
+  declare taxOffice: string | null
+  @column()
+  declare timezone: string
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime | null
+  @column()
+  declare vatNumber: string | null
 }
 
 export class SpatialRefSySchema extends BaseModel {
@@ -142,7 +285,7 @@ export class SpatialRefSySchema extends BaseModel {
 }
 
 export class UserSchema extends BaseModel {
-  static $columns = ['createdAt', 'email', 'fullName', 'id', 'password', 'updatedAt'] as const
+  static $columns = ['createdAt', 'email', 'fullName', 'id', 'locale', 'password', 'twoFactorEnabled', 'twoFactorRecoveryCodes', 'twoFactorSecret', 'type', 'updatedAt'] as const
   $columns = UserSchema.$columns
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -152,8 +295,18 @@ export class UserSchema extends BaseModel {
   declare fullName: string | null
   @column({ isPrimary: true })
   declare id: string
+  @column()
+  declare locale: string
   @column({ serializeAs: null })
   declare password: string
+  @column()
+  declare twoFactorEnabled: boolean
+  @column()
+  declare twoFactorRecoveryCodes: string | null
+  @column()
+  declare twoFactorSecret: string | null
+  @column()
+  declare type: string
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 }

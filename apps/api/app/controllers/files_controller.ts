@@ -1,4 +1,5 @@
 import File from '#models/file'
+import paginationConfig from '#config/pagination'
 import FileTransformer from '#transformers/file_transformer'
 import { listFilesValidator, MIME_TYPES, uploadFileValidator } from '#validators/file'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -10,15 +11,18 @@ import { randomUUID } from 'node:crypto'
  * and listed from the files table. Other users' files answer 404, as if missing.
  */
 export default class FilesController {
+  // Newest first
+  private orderBy = ['created_at', 'desc'] as const
+
   /**
-   * GET /files?page=1&perPage=20: the caller's files, newest first
+   * GET /files?page=1&search=&mimeType=: the caller's files
    */
   async index({ request, auth, serialize }: HttpContext) {
-    const { page = 1, perPage = 20 } = await request.validateUsing(listFilesValidator)
-    const files = await File.query()
+    const { page = 1, ...filters } = await request.validateUsing(listFilesValidator)
+    const files = await File.filter(filters)
       .withScopes((scopes) => scopes.ownedBy(auth.getUserOrFail()))
-      .orderBy('created_at', 'desc')
-      .paginate(page, perPage)
+      .orderBy(...this.orderBy)
+      .paginate(page, paginationConfig.perPage)
     return serialize(FileTransformer.paginate(files.all(), files.getMeta()))
   }
 
@@ -37,7 +41,9 @@ export default class FilesController {
         // The validator has already limited extname to the keys of MIME_TYPES
         mimeType: MIME_TYPES[upload.extname!],
         size: upload.size,
+        // Personal files for now; organization files come with the tenant middleware
         ownerId: owner.id,
+        uploadedBy: owner.id,
         attachableType: null,
         attachableId: null,
       })

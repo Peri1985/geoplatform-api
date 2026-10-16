@@ -21,6 +21,12 @@ const dbConfig = defineConfig({
         password: env.get('DB_PASSWORD'),
         database: env.get('DB_DATABASE'),
       },
+      /**
+       * public: shared tables (users, organizations, billing, platform)
+       * geocoding: the tables of the geocoding product (see documentations/backend/DB.md).
+       * Also tells migration:fresh, db:wipe and schema:generate which schemas to cover.
+       */
+      searchPath: ['public', 'geocoding'],
       migrations: {
         /**
          * Sort migration files naturally by filename.

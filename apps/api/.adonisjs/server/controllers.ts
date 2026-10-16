@@ -5,8 +5,17 @@
 
 export const controllers = {
   AccessTokens: () => import('#controllers/access_tokens_controller'),
+  Docs: () => import('#controllers/docs_controller'),
   Files: () => import('#controllers/files_controller'),
+  geocoding: {
+    ApiKeys: () => import('#controllers/geocoding/api_keys_controller'),
+    Plans: () => import('#controllers/geocoding/plans_controller'),
+    Subscriptions: () => import('#controllers/geocoding/subscriptions_controller'),
+    Usage: () => import('#controllers/geocoding/usage_controller'),
+  },
   Health: () => import('#controllers/health_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
+  OrganizationMembers: () => import('#controllers/organization_members_controller'),
+  Organizations: () => import('#controllers/organizations_controller'),
   Profile: () => import('#controllers/profile_controller'),
 }

@@ -22,7 +22,7 @@ test.group('Audit log', (group) => {
     client,
     assert,
   }) => {
-    const response = await client.post('/api/v1/auth/signup').json({
+    const response = await client.post('/v1/auth/signup').json({
       fullName: 'Maria P',
       email: 'maria@test.local',
       password,
@@ -44,12 +44,12 @@ test.group('Audit log', (group) => {
   }) => {
     const user = await createUser()
     const upload = await client
-      .post('/api/v1/files')
+      .post('/v1/files')
       .header('User-Agent', 'audit-test')
       .file('file', geojson, { filename: 'port.geojson' })
       .loginAs(user)
     const fileId = (upload.body().data as { file: { id: string } }).file.id
-    await client.delete(`/api/v1/files/${fileId}`).loginAs(user)
+    await client.delete(`/v1/files/${fileId}`).loginAs(user)
 
     const [created] = await entries('files.created')
     assert.equal(created.userId, user.id)

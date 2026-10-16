@@ -5,13 +5,58 @@
 
 /// <reference path="./manifest.d.ts" />
 import type { InferData, InferVariants } from '@adonisjs/core/types/transformers'
+import type AuditLogTransformer from '#transformers/audit_log_transformer'
 import type FileTransformer from '#transformers/file_transformer'
+import type GeocodingApiKeyTransformer from '#transformers/geocoding_api_key_transformer'
+import type GeocodingApiUsageDailyTransformer from '#transformers/geocoding_api_usage_daily_transformer'
+import type GeocodingApiUsageMonthlyTransformer from '#transformers/geocoding_api_usage_monthly_transformer'
+import type GeocodingApiUsageTransformer from '#transformers/geocoding_api_usage_transformer'
+import type GeocodingPlanTransformer from '#transformers/geocoding_plan_transformer'
+import type GeocodingSubscriptionTransformer from '#transformers/geocoding_subscription_transformer'
+import type OrganizationMemberTransformer from '#transformers/organization_member_transformer'
+import type OrganizationTransformer from '#transformers/organization_transformer'
 import type UserTransformer from '#transformers/user_transformer'
 
 export namespace Data {
+  export type AuditLog = InferData<AuditLogTransformer>
+  export namespace AuditLog {
+    export type Variants = InferVariants<AuditLogTransformer>
+  }
   export type File = InferData<FileTransformer>
   export namespace File {
     export type Variants = InferVariants<FileTransformer>
+  }
+  export type GeocodingApiKey = InferData<GeocodingApiKeyTransformer>
+  export namespace GeocodingApiKey {
+    export type Variants = InferVariants<GeocodingApiKeyTransformer>
+  }
+  export type GeocodingApiUsageDaily = InferData<GeocodingApiUsageDailyTransformer>
+  export namespace GeocodingApiUsageDaily {
+    export type Variants = InferVariants<GeocodingApiUsageDailyTransformer>
+  }
+  export type GeocodingApiUsageMonthly = InferData<GeocodingApiUsageMonthlyTransformer>
+  export namespace GeocodingApiUsageMonthly {
+    export type Variants = InferVariants<GeocodingApiUsageMonthlyTransformer>
+  }
+  export type GeocodingApiUsage = InferData<GeocodingApiUsageTransformer>
+  export namespace GeocodingApiUsage {
+    export type Variants = InferVariants<GeocodingApiUsageTransformer>
+  }
+  export type GeocodingPlan = InferData<GeocodingPlanTransformer>
+  export namespace GeocodingPlan {
+    export type Variants = InferVariants<GeocodingPlanTransformer>
+  }
+  export type GeocodingSubscription = InferData<GeocodingSubscriptionTransformer>
+  export namespace GeocodingSubscription {
+    export type Variants = InferVariants<GeocodingSubscriptionTransformer>
+  }
+  export type OrganizationMember = InferData<OrganizationMemberTransformer>
+  export namespace OrganizationMember {
+    export type Variants = InferVariants<OrganizationMemberTransformer>
+  }
+  export type Organization = InferData<OrganizationTransformer>
+  export namespace Organization {
+    export type Variants = InferVariants<OrganizationTransformer>
   }
   export type User = InferData<UserTransformer>
   export namespace User {

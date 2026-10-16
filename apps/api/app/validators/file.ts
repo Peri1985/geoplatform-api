@@ -1,4 +1,5 @@
 import vine from '@vinejs/vine'
+import { pagination, search } from '#validators/pagination'
 
 /**
  * File types accepted for upload (images, documents, common geodata formats),
@@ -31,6 +32,7 @@ export const uploadFileValidator = vine.create({
  * Query string of GET /files
  */
 export const listFilesValidator = vine.create({
-  page: vine.number().min(1).optional(),
-  perPage: vine.number().min(1).max(100).optional(),
+  ...pagination,
+  search: search(),
+  mimeType: vine.string().trim().maxLength(255).optional(),
 })

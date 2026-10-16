@@ -9,6 +9,7 @@ export default class FileTransformer extends BaseTransformer<File> {
       'mimeType',
       'size',
       'ownerId',
+      'uploadedBy',
       'attachableType',
       'attachableId',
       'createdAt',

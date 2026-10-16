@@ -2,11 +2,14 @@
 
 Το backend (`apps/api`) χρησιμοποιεί **PostgreSQL 18 με PostGIS 3.6**, μέσω του [Lucid](https://lucid.adonisjs.com), του ORM του AdonisJS. Η βάση τρέχει τοπικά στο Docker (βλ. [DOCKER.md](../infrastructure/DOCKER.md)).
 
+Οι πίνακες είναι χωρισμένοι σε **PostgreSQL schemas**: `public` για τα κοινά, και ένα για κάθε προϊόν. Προς το παρόν υπάρχει μόνο το `geocoding`. Το task management (schema `tasks`) θα προστεθεί αργότερα. Βλ. [Schemas](#schemas).
+
 Το schema αλλάζει **μόνο με migrations**. Μετά από κάθε migration, το Adonis ξαναπαράγει αυτόματα το `database/schema.ts`, δηλαδή τις κλάσεις με τις στήλες κάθε πίνακα, και τα models επεκτείνουν αυτές τις κλάσεις.
 
 ## Περιεχόμενα
 
 - [Σύνδεση](#σύνδεση)
+- [Schemas](#schemas)
 - [Αρχεία](#αρχεία)
 - [Models και το παραγόμενο schema](#models-και-το-παραγόμενο-schema)
 - [Migrations](#migrations)
@@ -35,7 +38,57 @@
 docker compose exec postgres psql -U geoplatform
 ```
 
-Χρήσιμες εντολές μέσα στο `psql`: `\dt` (πίνακες), `\d users` (δομή ενός πίνακα), `\q` (έξοδος).
+Χρήσιμες εντολές μέσα στο `psql`: `\dt` (πίνακες του `public`), `\dt geocoding.*` (πίνακες ενός schema), `\d geocoding.geocoding_api_keys` (δομή ενός πίνακα), `\dn` (schemas), `\q` (έξοδος).
+
+## Schemas
+
+| Schema | Τι περιέχει | Models |
+| --- | --- | --- |
+| `public` | Τα κοινά: χρήστες, οργανισμοί (πελάτες) και μέλη, αρχεία, audit | `app/models/*.ts` |
+| `geocoding` | Προϊόν 1: πακέτα, συνδρομές, API keys, χρήση | `app/models/geocoding_*.ts` |
+
+Τα πακέτα και οι συνδρομές είναι στο schema κάθε προϊόντος.
+
+Η σύνδεση έχει `searchPath: ['public', 'geocoding']` ([config/database.ts](../../apps/api/config/database.ts)). Αυτό λέει στα `migration:fresh`, `db:wipe` και `schema:generate` να καλύπτουν και τα δύο. **Νέο schema** θέλει migration με `CREATE SCHEMA` **και** προσθήκη στο `searchPath`.
+
+**Migration σε άλλο schema:** `withSchema(...)`, και foreign keys με το schema του άλλου πίνακα:
+
+```ts
+this.schema.withSchema('geocoding').createTable('geocoding_api_keys', (table) => {
+  table.uuid('id').primary().defaultTo(this.raw('gen_random_uuid()'))
+  table.uuid('organization_id').notNullable().references('id').inTable('public.organizations').onDelete('CASCADE')
+  // enum μέσα στο schema
+  table.enu('environment', ['production', 'test'], { useNative: true, enumName: 'api_key_environment', schemaName: 'geocoding' })
+})
+
+// down
+this.schema.withSchema('geocoding').dropTable('geocoding_api_keys')
+this.schema.raw('DROP TYPE IF EXISTS geocoding.api_key_environment')
+```
+
+> [!IMPORTANT]
+> **Τα ονόματα πινάκων πρέπει να είναι μοναδικά σε όλη τη βάση**, όχι μόνο μέσα στο schema τους. Ο generator του `schema.ts` ονομάζει την κλάση μόνο από το όνομα του πίνακα (`plans` → `PlanSchema`), οπότε δύο πίνακες `plans` σε διαφορετικά schemas θα έβγαζαν την ίδια κλάση δύο φορές, και το build θα έσπαγε. Γι' αυτό **κάθε πίνακας ενός προϊόντος έχει πρόθεμα το schema του**: `geocoding.geocoding_plans` → `GeocodingPlanSchema`, `geocoding.geocoding_api_keys` → `GeocodingApiKeySchema`. Το ίδιο θα ισχύει για το `tasks` (`tasks.tasks_...`).
+>
+> Το ίδιο ισχύει για τα **enums**: το `migration:fresh --drop-types` τα σβήνει με το όνομά τους χωρίς το schema, οπότε από δύο enums με το ίδιο όνομα σβήνει μόνο το ένα, και το επόμενο migration αποτυγχάνει με `type "..." already exists`. Π.χ. `geocoding.api_key_environment`, όχι `geocoding.environment`.
+
+**Model σε άλλο schema:** δηλώνεις ρητά τον πίνακα με το schema του. Το παραγόμενο schema δεν το κάνει μόνο του:
+
+```ts
+// app/models/geocoding_api_key.ts
+export default class GeocodingApiKey extends compose(GeocodingApiKeySchema, withAudit()) {
+  static table = 'geocoding.geocoding_api_keys'
+}
+```
+
+Στο audit και στις πολυμορφικές σχέσεις (`files.attachable_type`), ο τύπος μιας εγγραφής είναι το `table` του model, π.χ. `geocoding.geocoding_api_keys`.
+
+### Απομόνωση πελατών (multi-tenancy)
+
+Κάθε πίνακας με δεδομένα πελάτη έχει **`organization_id`**, ακόμα κι όταν θα μπορούσε να το βρει μέσω σχέσης (π.χ. `geocoding.geocoding_api_usage` μέσω του API key). Έτσι κάθε query φιλτράρεται άμεσα με τον οργανισμό. **Κάθε query σε δεδομένα πελάτη πρέπει να περιορίζεται σε έναν οργανισμό.**
+
+Τι γίνεται όταν σβήνεται ένας οργανισμός:
+- **σβήνονται μαζί του** (`CASCADE`): μέλη, συνδρομές, API keys, χρήση
+- **δεν σβήνονται αυτόματα:** τα αρχεία του (`files.owner_id` δεν είναι foreign key). Η διαγραφή οργανισμού πρέπει να τα σβήνει η ίδια, από το S3 και από τη βάση
 
 ## Αρχεία
 
@@ -45,7 +98,8 @@ docker compose exec postgres psql -U geoplatform
 | [database/migrations/](../../apps/api/database/migrations/) | Τα migrations, δηλαδή το ιστορικό αλλαγών του schema |
 | [database/schema.ts](../../apps/api/database/schema.ts) | **Παράγεται αυτόματα** μετά από κάθε migration. Μην το αλλάζεις με το χέρι |
 | [database/schema_rules.ts](../../apps/api/database/schema_rules.ts) | Κανόνες για το `schema.ts`: τύποι στηλών, στήλες που εξαιρούνται |
-| [app/models/](../../apps/api/app/models/) | Τα models, ένα ανά πίνακα |
+| [app/models/](../../apps/api/app/models/) | Τα models, ένα ανά πίνακα, με πρόθεμα το schema τους (`geocoding_*.ts`, κλάσεις `Geocoding*`) |
+| [app/decorators/](../../apps/api/app/decorators/) | Decorators για ειδικές στήλες: `jsonColumn` (jsonb) και `pointColumn` (PostGIS Point ως GeoJSON) |
 
 ## Models και το παραγόμενο schema
 
@@ -77,10 +131,27 @@ export default class User extends compose(UserSchema, withAuthFinder(hash)) {
   } satisfies SchemaRules
   ```
 
+- **jsonb:** ο κανόνας χρησιμοποιεί το `@jsonColumn`, που αποθηκεύει την τιμή με `JSON.stringify`. Με σκέτο `@column`, ο driver θα έστελνε μια λίστα της JavaScript ως πίνακα PostgreSQL και όχι ως JSON, και το insert θα αποτύγχανε. Για παράδειγμα:
+
+  ```ts
+  geocoding_api_keys: {
+    columns: {
+      allowed_domains: {
+        tsType: 'string[]',
+        decorators: [{ name: '@jsonColumn' }],
+        imports: [{ source: '#decorators/json_column', namedImports: ['jsonColumn'] }],
+      },
+    },
+  },
+  ```
+
+  Στο [schema_rules.ts](../../apps/api/database/schema_rules.ts) υπάρχουν έτοιμοι βοηθοί: `union('a', 'b')` για enums και `json('string[]')` για jsonb.
+- **Οι κανόνες γράφονται με το όνομα του πίνακα χωρίς το schema** (`geocoding_api_keys`, όχι `geocoding.geocoding_api_keys`).
+- **Τα δεκαδικά** (`decimal`, π.χ. τιμές) είναι `string` στον κώδικα, όχι `number`. Η PostgreSQL τα στέλνει ως κείμενο ώστε να μη χάνεται ακρίβεια σε χρηματικά ποσά. Για πράξεις χρησιμοποίησε βιβλιοθήκη δεκαδικών, όχι `Number()`.
 - Για να ξαναπαραχθεί το `schema.ts` χωρίς migration: `npm run ace -w api -- schema:generate`.
 
 > [!NOTE]
-> Οι default τιμές της βάσης **δεν** εμφανίζονται στο model μετά από `create()`, γιατί το Lucid δεν ξαναδιαβάζει την εγγραφή. Όπου χρειάζεσαι την τιμή αμέσως, δώσ' τη ρητά στο `create()`.
+> Το Lucid **δεν** ξαναδιαβάζει την εγγραφή μετά από `create()`, οπότε οι default τιμές της βάσης (π.χ. `status = 'todo'`) δεν εμφανίζονται στο model. Στα models με `withAudit()` αυτό λύνεται αυτόματα: το mixin ξαναδιαβάζει την εγγραφή, ώστε και το audit να καταγράφει σωστά. Στα υπόλοιπα, δώσε την τιμή ρητά στο `create()` ή κάνε `await row.refresh()`.
 
 ## Migrations
 
@@ -225,7 +296,7 @@ this.schema.raw('CREATE INDEX places_location_gist ON places USING gist (locatio
 Η PostgreSQL επιστρέφει τις στήλες geometry σε δυαδική μορφή (hex EWKB), όχι σε GeoJSON. Δύο τρόποι:
 
 - **Ανάγνωση με `ST_AsGeoJSON`** στο query: `Place.query().select('*', db.raw('ST_AsGeoJSON(location)::json AS location'))`. Είναι ο πιο απλός τρόπος και δουλεύει για κάθε είδος γεωμετρίας.
-- **Custom στήλη** με `prepare` / `consume` στο `@column(...)`, που μετατρέπει αυτόματα σε κάθε ανάγνωση και εγγραφή. Για την εγγραφή, το PostGIS δέχεται απευθείας κείμενο EWKT (`SRID=4326;POINT(23.64 37.94)`). Υλοποίηση για Point υπάρχει στο ιστορικό του git (commit `50cedd4`, `apps/api/app/columns/point.ts`).
+- **Custom στήλη** με `prepare` / `consume` στο `@column(...)`, που μετατρέπει αυτόματα σε κάθε ανάγνωση και εγγραφή. Για την εγγραφή, το PostGIS δέχεται απευθείας κείμενο EWKT (`SRID=4326;POINT(23.64 37.94)`). Υλοποίηση για Point υπάρχει στο ιστορικό του git (commit `50cedd4`, `apps/api/app/decorators/point_column.ts`).
 
 Εξαίρεσε τη στήλη από το παραγόμενο schema (`skipColumns: ['location']` στο `schema_rules.ts`) και δήλωσέ τη στο model.
 
@@ -262,24 +333,41 @@ static withinRadius = scope((query, { lat, lon, radius }: { lat: number; lon: nu
 
 ## Το τρέχον schema
 
-| Πίνακας | Migration | Τι κρατάει |
+Όλα τα ids είναι UUID, με default `gen_random_uuid()`, και όλες οι ημερομηνίες `timestamptz`. Ενημέρωνε αυτούς τους πίνακες όταν προσθέτεις πίνακα.
+
+### `public`
+
+| Πίνακας | Model | Τι κρατάει |
 | --- | --- | --- |
-| `users` | [create_users_table](../../apps/api/database/migrations/1761885935168_create_users_table.ts) | Χρήστες: όνομα, email (μοναδικό, πεζά), hash κωδικού (scrypt) |
-| `files` | [create_files_table](../../apps/api/database/migrations/1792070000000_create_files_table.ts) | Τα αρχεία στο S3: key, όνομα, τύπος, μέγεθος, ιδιοκτήτης (`owner_id` → `users`, `CASCADE`), και πολυμορφική σύνδεση (`attachable_type`, `attachable_id`, χωρίς foreign key). Βλ. [STORAGE.md](../infrastructure/STORAGE.md#ο-πίνακας-files-πολυμορφικός) |
-| `auth_access_tokens` | [create_access_tokens_table](../../apps/api/database/migrations/1768620764696_create_access_tokens_table.ts) | Τα access tokens (μόνο το hash τους), με λήξη. Σβήνονται μαζί με τον χρήστη. Βλ. [AUTH.md](AUTH.md) |
-| `groups` | [create_groups_table](../../apps/api/database/migrations/1792070855669_create_groups_table.ts) | Ομάδες χρηστών. `name` υποχρεωτικό, όχι μοναδικό (δύο ομάδες μπορούν να έχουν το ίδιο όνομα). Model: `Group` |
-| `group_user` | [create_group_user_table](../../apps/api/database/migrations/1792070866118_create_group_user_table.ts) | Pivot: ποιος χρήστης ανήκει σε ποια ομάδα. Μοναδικό ζευγάρι, σβήνεται μαζί με τον χρήστη ή την ομάδα. Σχέση `user.groups` / `group.users` |
-| `roles` | [create_roles_table](../../apps/api/database/migrations/1792071093467_create_roles_table.ts) | Ρόλοι: `name`, `sector` και `role`, όλα υποχρεωτικά. Model: `Role` |
-| `role_user` | [create_role_user_table](../../apps/api/database/migrations/1792071103231_create_role_user_table.ts) | Pivot: ποιος χρήστης έχει ποιον ρόλο. Μοναδικό ζευγάρι, σβήνεται μαζί με τον χρήστη ή τον ρόλο. Σχέση `user.roles` / `role.users` |
-| `audit_logs` | [create_audit_logs_table](../../apps/api/database/migrations/1792080000000_create_audit_logs_table.ts) | Ποιος έκανε τι, σε ποια εγγραφή, πότε και από πού. Μόνο προσθήκες (trigger `audit_logs_no_update`). Βλ. [AUDIT.md](AUDIT.md) |
-| `adonis_schema`, `adonis_schema_versions` | Lucid | Ποια migrations έχουν τρέξει. Μην τα αλλάζεις με το χέρι |
-| `spatial_ref_sys` | PostGIS | Τα συστήματα συντεταγμένων. Μην τον αλλάζεις |
+| `users` | `User` | Χρήστες: όνομα, email (μοναδικό), hash κωδικού (scrypt), `type`, γλώσσα, 2FA (κρυπτογραφημένο από την εφαρμογή) |
+| `organizations` | `Organization` | Οι πελάτες (tenants): όνομα, κατάσταση (`active`/`suspended`), γλώσσα, ζώνη ώρας, στοιχεία τιμολόγησης (επωνυμία, ΑΦΜ, ΔΟΥ, διεύθυνση), Stripe customer |
+| `organization_members` | `OrganizationMember` | Ποιος χρήστης ανήκει σε ποιον οργανισμό, με **ρόλο** (`admin` = Tenant Admin, `member`, `guest`) και κατάσταση. Μία φορά ανά οργανισμό. Σχέσεις `user.organizations` / `organization.users` (με `pivot_role`) |
+| — | — | **Προσκλήσεις:** δεν έχουν πίνακα. Γίνονται με signed URL (`router.urlBuilder.signedUrlFor`, έλεγχος με `request.hasValidSignature()`), που περιέχει οργανισμό, email και ρόλο, με λήξη. Δεν μπορούν να ακυρωθούν πριν λήξουν, και δεν υπάρχει λίστα εκκρεμών προσκλήσεων |
+| `auth_access_tokens` | — | Τα access tokens (μόνο το hash τους), με λήξη. Βλ. [AUTH.md](AUTH.md) |
+| `files` | `File` | Τα αρχεία στο S3: ιδιοκτήτης (`owner_id`: χρήστης **ή** οργανισμός, χωρίς foreign key), ποιος το ανέβασε (`uploaded_by`), και πολυμορφική σύνδεση (`attachable_*`). Βλ. [STORAGE.md](../infrastructure/STORAGE.md#ο-πίνακας-files-πολυμορφικός) |
+| `audit_logs` | `AuditLog` | Ποιος έκανε τι, σε ποια εγγραφή, πότε και από πού. Μόνο προσθήκες. Βλ. [AUDIT.md](AUDIT.md) |
+
+### `geocoding`
+
+| Πίνακας | Model | Τι κρατάει |
+| --- | --- | --- |
+| `geocoding_plans` | `GeocodingPlan` | Τα πακέτα του API: `code`, όνομα, μηνιαία τιμή (χωρίς ΦΠΑ), κλήσεις ανά μήνα και ανά δευτερόλεπτο (`NULL` = χωρίς όριο), αν μπορεί να το διαλέξει νέος πελάτης (`is_active`). Ένα πακέτο με συνδρομητές **δεν αλλάζει**: φτιάχνεις νέο και απενεργοποιείς το παλιό |
+| `geocoding_subscriptions` | `GeocodingSubscription` | Η συνδρομή ενός οργανισμού στο API: πακέτο, `starts_at`, `ends_at` (`NULL` = ενεργή). **Το πολύ μία ενεργή ανά οργανισμό**: για αλλαγή πακέτου, η τρέχουσα παίρνει `ends_at` και φτιάχνεται νέα |
+| `geocoding_api_keys` | `GeocodingApiKey` | Τα κλειδιά: όνομα, production/test, ορατό πρόθεμα, hash, περιορισμοί domain και IP, λήξη, ανάκληση |
+| `geocoding_api_usage` | `GeocodingApiUsage` | Μία εγγραφή ανά κλήση: endpoint, status, χρόνος, αποτελέσματα, αν χρεώνεται. **Όχι** η διεύθυνση που αναζητήθηκε |
+| `geocoding_api_usage_daily` | `GeocodingApiUsageDaily` | Πόσες κλήσεις έκανε κάθε οργανισμός κάθε μέρα. Μία γραμμή ανά οργανισμό και μέρα. Για γραφήματα και ποσόστωση χωρίς μέτρημα του `api_usage` |
+| `geocoding_api_usage_monthly` | `GeocodingApiUsageMonthly` | Πόσες κλήσεις έκανε κάθε οργανισμός κάθε μήνα (`period` = `YYYY-MM`). Μία γραμμή ανά οργανισμό και μήνα. Συγκρίνεται με το `monthly_quota` του πακέτου για να δούμε αν ξεπεράστηκε το όριο |
+
+Το `api_usage` θα μεγαλώνει γρήγορα (ένας πελάτης Pro: έως 500.000 εγγραφές τον μήνα). Όταν χρειαστεί, γίνεται **partitioned ανά μήνα** (PostgreSQL declarative partitioning), ώστε τα παλιά δεδομένα να σβήνονται ανά μήνα.
+
+### Συστήματος
+
+| Πίνακας | Τι κρατάει |
+| --- | --- |
+| `adonis_schema`, `adonis_schema_versions` | Ποια migrations έχουν τρέξει. Μην τα αλλάζεις με το χέρι |
+| `spatial_ref_sys` | Τα συστήματα συντεταγμένων του PostGIS. Μην τον αλλάζεις |
 
 Extensions: `postgis` (από το migration [enable_postgis](../../apps/api/database/migrations/1761885935000_enable_postgis.ts)). Το docker image προσθέτει επίσης `postgis_topology`, `postgis_tiger_geocoder` και `fuzzystrmatch`. Γι' αυτό το `down` του `enable_postgis` δεν σβήνει το PostGIS: τα άλλα extensions εξαρτώνται από αυτό.
-
-Όλα τα ids είναι UUID, με default `gen_random_uuid()`.
-
-Ενημέρωνε αυτόν τον πίνακα όταν προσθέτεις πίνακα.
 
 ## Συχνά προβλήματα
 

@@ -24,14 +24,18 @@ npx turbo dev --filter admin...    # το admin μαζί με ό,τι χρειά
 
 ## Κλήσεις στο API
 
-Και τα δύο apps προωθούν (proxy) το `/api` στο api (`http://localhost:3333`). Η ρύθμιση είναι στο `vite.config.ts`:
+Και τα δύο apps προωθούν (proxy) το `/api` στο api (`http://localhost:3333`), **αφαιρώντας** το `/api`: το `/api/v1/health` του browser φτάνει στο api ως `/v1/health`. Η ρύθμιση είναι στο `vite.config.ts`:
 
 ```ts
 server: {
   port: 5173,
   strictPort: true,
   proxy: {
-    '/api': 'http://localhost:3333',
+    // /api/v1/health -> http://localhost:3333/v1/health
+    '/api': {
+      target: 'http://localhost:3333',
+      rewrite: (path) => path.replace(/^\/api/, ''),
+    },
   },
 },
 ```

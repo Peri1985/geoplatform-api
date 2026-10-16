@@ -4,7 +4,7 @@ Monorepo με npm workspaces και Turborepo: ένα backend σε AdonisJS, δ�
 
 | Φάκελος           | Πακέτο         | Τι είναι                                             | Port |
 | ----------------- | -------------- | ---------------------------------------------------- | ---- |
-| `apps/api`        | `api`          | AdonisJS 7 backend, όλα τα routes κάτω από `/api/v1` | 3333 |
+| `apps/api`        | `api`          | AdonisJS 7 backend, όλα τα routes κάτω από `/v1` | 3333 |
 | `apps/admin`      | `admin`        | React 19 + Vite 8 frontend                           | 5173 |
 | `apps/account`    | `account`      | React 19 + Vite 8 frontend                           | 5174 |
 | `packages/shared` | `@repo/shared` | Zod schemas και TypeScript types για τα frontends    | —    |
@@ -45,7 +45,7 @@ npm run dev                                       # api, admin, account και s
 
 Μετά το `npm run dev`:
 
-- API: http://localhost:3333/api/v1/health
+- API: http://localhost:3333/v1/health
 - RustFS console: http://localhost:9001
 - admin: http://localhost:5173
 - account: http://localhost:5174

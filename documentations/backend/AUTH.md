@@ -28,10 +28,10 @@
 
 | Method | Path | Ποιος | Body | Επιστρέφει |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/v1/auth/signup` | Όλοι | `{ fullName, email, password, passwordConfirmation }` | Χρήστη και token |
-| `POST` | `/api/v1/auth/login` | Όλοι | `{ email, password }` | Χρήστη και token |
-| `GET` | `/api/v1/account/profile` | Συνδεδεμένοι | — | Τον συνδεδεμένο χρήστη |
-| `POST` | `/api/v1/account/logout` | Συνδεδεμένοι | — | Ακυρώνει το token του request |
+| `POST` | `/v1/auth/signup` | Όλοι | `{ fullName, email, password, passwordConfirmation }` | Χρήστη και token |
+| `POST` | `/v1/auth/login` | Όλοι | `{ email, password }` | Χρήστη και token |
+| `GET` | `/v1/account/profile` | Συνδεδεμένοι | — | Τον συνδεδεμένο χρήστη |
+| `POST` | `/v1/account/logout` | Συνδεδεμένοι | — | Ακυρώνει το token του request |
 
 - Το `fullName` μπορεί να είναι `null`. Ο κωδικός έχει μήκος 8 έως 32 χαρακτήρες και το `passwordConfirmation` πρέπει να είναι ίδιο.
 - Τα email αποθηκεύονται με πεζά, οπότε το `Maria@x.gr` και το `maria@x.gr` είναι ο ίδιος λογαριασμός.
@@ -67,20 +67,20 @@
 
 ```bash
 # 1. Εγγραφή (επιστρέφει ήδη token)
-curl -X POST http://localhost:3333/api/v1/auth/signup \
+curl -X POST http://localhost:3333/v1/auth/signup \
   -H 'content-type: application/json' \
   -d '{"fullName":"Maria P","email":"maria@example.com","password":"correct-horse-battery","passwordConfirmation":"correct-horse-battery"}'
 
 # 2. Login: κράτα το data.token
-curl -X POST http://localhost:3333/api/v1/auth/login \
+curl -X POST http://localhost:3333/v1/auth/login \
   -H 'content-type: application/json' \
   -d '{"email":"maria@example.com","password":"correct-horse-battery"}'
 
 # 3. Κάθε request με το token
-curl http://localhost:3333/api/v1/account/profile -H 'Authorization: Bearer <token>'
+curl http://localhost:3333/v1/account/profile -H 'Authorization: Bearer <token>'
 
 # 4. Logout
-curl -X POST http://localhost:3333/api/v1/account/logout -H 'Authorization: Bearer <token>'
+curl -X POST http://localhost:3333/v1/account/logout -H 'Authorization: Bearer <token>'
 ```
 
 Τι πρέπει να κάνει κάθε client:
@@ -124,7 +124,7 @@ async show({ auth, serialize }: HttpContext) {
 | Κωδικοί με **scrypt** (ενσωματωμένο στο Node), ποτέ σε καθαρό κείμενο | [config/hash.ts](../../apps/api/config/hash.ts) |
 | Τα tokens αποθηκεύονται μόνο ως hash: μια διαρροή της βάσης δεν δίνει έγκυρα tokens | `@adonisjs/auth` |
 | Ίδια απάντηση για λάθος κωδικό και άγνωστο email, ώστε να μη φαίνεται ποια email υπάρχουν | `User.verifyCredentials` |
-| **Όριο 10 requests το λεπτό ανά IP** στα `/api/v1/auth/*` (signup, login), αποθηκευμένο στο Redis | [start/limiter.ts](../../apps/api/start/limiter.ts) |
+| **Όριο 10 requests το λεπτό ανά IP** στα `/v1/auth/*` (signup, login), αποθηκευμένο στο Redis | [start/limiter.ts](../../apps/api/start/limiter.ts) |
 | Security headers (X-Frame-Options, HSTS, nosniff) | [config/shield.ts](../../apps/api/config/shield.ts) |
 
 Γνωστά όρια:
@@ -152,5 +152,5 @@ async show({ auth, serialize }: HttpContext) {
 Δεν υπάρχουν ακόμα, και προστίθενται χωρίς αλλαγές στα παραπάνω:
 
 - **Ρόλοι και δικαιώματα:** με το [`@adonisjs/bouncer`](https://docs.adonisjs.com/guides/security/authorization) (`npm run ace -w api -- add @adonisjs/bouncer`). Abilities για γενικά δικαιώματα (π.χ. «διαχειρίζεται χρήστες») και policies για δικαιώματα πάνω σε μία εγγραφή (π.χ. «αλλάζει μόνο τα δικά του»). Μια πλήρης υλοποίηση, με ρόλους `admin`/`user`, απενεργοποίηση χρηστών και εντολή `create:admin`, υπάρχει στο ιστορικό του git (commit `50cedd4`).
-- **Google login:** ο client κάνει «Sign in with Google» και στέλνει το Google ID token στο `POST /api/v1/auth/google`. Το api το ελέγχει με το `google-auth-library` ([Verify the Google ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)), βρίσκει ή δημιουργεί τον χρήστη, και επιστρέφει `User.accessTokens.create(user)`, όπως το login. Χρειάζεται migration για στήλη `google_id`, και το `password` να γίνει `nullable`.
-- **Refresh tokens**, αν χρειαστούν πιο σύντομα access tokens (π.χ. για mobile app): δεύτερος provider στο model, `DbAccessTokensProvider.forModel(User, { type: 'refresh_token', prefix: 'ort_', expiresIn: '30 days' })`, και endpoint `POST /api/v1/auth/refresh` που ελέγχει το refresh token, το σβήνει και δίνει νέο ζευγάρι.
+- **Google login:** ο client κάνει «Sign in with Google» και στέλνει το Google ID token στο `POST /v1/auth/google`. Το api το ελέγχει με το `google-auth-library` ([Verify the Google ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)), βρίσκει ή δημιουργεί τον χρήστη, και επιστρέφει `User.accessTokens.create(user)`, όπως το login. Χρειάζεται migration για στήλη `google_id`, και το `password` να γίνει `nullable`.
+- **Refresh tokens**, αν χρειαστούν πιο σύντομα access tokens (π.χ. για mobile app): δεύτερος provider στο model, `DbAccessTokensProvider.forModel(User, { type: 'refresh_token', prefix: 'ort_', expiresIn: '30 days' })`, και endpoint `POST /v1/auth/refresh` που ελέγχει το refresh token, το σβήνει και δίνει νέο ζευγάρι.

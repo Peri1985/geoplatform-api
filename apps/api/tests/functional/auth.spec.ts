@@ -6,13 +6,13 @@ test.group('Auth', (group) => {
   isolate(group)
 
   test('health is public', async ({ client }) => {
-    const response = await client.get('/api/v1/health')
+    const response = await client.get('/v1/health')
     response.assertStatus(200)
     response.assertBody({ status: 'ok' })
   })
 
   test('signup creates a user and returns a token', async ({ client, assert }) => {
-    const response = await client.post('/api/v1/auth/signup').json({
+    const response = await client.post('/v1/auth/signup').json({
       fullName: 'Maria P',
       email: 'Maria@Test.local',
       password,
@@ -28,7 +28,7 @@ test.group('Auth', (group) => {
 
   test('signup rejects an email that exists in another case', async ({ client }) => {
     const user = await createUser()
-    const response = await client.post('/api/v1/auth/signup').json({
+    const response = await client.post('/v1/auth/signup').json({
       fullName: null,
       email: user.email.toUpperCase(),
       password,
@@ -42,7 +42,7 @@ test.group('Auth', (group) => {
     const authorization = await login(client, user)
 
     const profile = await client
-      .get('/api/v1/account/profile')
+      .get('/v1/account/profile')
       .header('Authorization', authorization)
     profile.assertStatus(200)
     assert.equal(profile.body().data.email, user.email)
@@ -52,10 +52,10 @@ test.group('Auth', (group) => {
     const user = await createUser()
 
     const wrongPassword = await client
-      .post('/api/v1/auth/login')
+      .post('/v1/auth/login')
       .json({ email: user.email, password: 'wrong-password' })
     const unknownEmail = await client
-      .post('/api/v1/auth/login')
+      .post('/v1/auth/login')
       .json({ email: 'nobody@test.local', password })
 
     wrongPassword.assertStatus(400)
@@ -64,11 +64,11 @@ test.group('Auth', (group) => {
   })
 
   test('protected routes need a valid token', async ({ client }) => {
-    const withoutToken = await client.get('/api/v1/account/profile')
+    const withoutToken = await client.get('/v1/account/profile')
     withoutToken.assertStatus(401)
 
     const withBadToken = await client
-      .get('/api/v1/account/profile')
+      .get('/v1/account/profile')
       .header('Authorization', 'Bearer not-a-token')
     withBadToken.assertStatus(401)
   })
@@ -78,12 +78,12 @@ test.group('Auth', (group) => {
     const authorization = await login(client, user)
 
     const logout = await client
-      .post('/api/v1/account/logout')
+      .post('/v1/account/logout')
       .header('Authorization', authorization)
     logout.assertStatus(200)
 
     const profile = await client
-      .get('/api/v1/account/profile')
+      .get('/v1/account/profile')
       .header('Authorization', authorization)
     profile.assertStatus(401)
   })
@@ -99,7 +99,7 @@ test.group('Auth', (group) => {
 
   test('login is limited to 10 attempts per minute per IP', async ({ client }) => {
     const attempt = () =>
-      client.post('/api/v1/auth/login').json({ email: 'nobody@test.local', password })
+      client.post('/v1/auth/login').json({ email: 'nobody@test.local', password })
 
     for (let i = 0; i < 10; i++) {
       const response = await attempt()

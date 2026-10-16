@@ -9,4 +9,5 @@
 /// <reference path="../../config/hash.ts" />
 /// <reference path="../../config/limiter.ts" />
 /// <reference path="../../config/logger.ts" />
+/// <reference path="../../config/pagination.ts" />
 /// <reference path="../../config/redis.ts" />

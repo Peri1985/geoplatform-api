@@ -1,37 +1,42 @@
 import { UserSchema } from '#database/schema'
+import { withFilters } from '#mixins/with_filters'
+import { filters } from '#generated/filters'
 import { withAudit } from '#mixins/with_audit'
-import Group from '#models/group'
-import Role from '#models/role'
+import Organization from '#models/organization'
+import OrganizationMember from '#models/organization_member'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { type AccessToken, DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { manyToMany } from '@adonisjs/lucid/orm'
-import type { ManyToMany } from '@adonisjs/lucid/types/relations'
+import { hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 
-export default class User extends compose(UserSchema, withAuthFinder(hash), withAudit()) {
+export default class User extends compose(
+  UserSchema,
+  withAuthFinder(hash),
+  withAudit(),
+  withFilters(filters.User)
+) {
   static accessTokens = DbAccessTokensProvider.forModel(User, { expiresIn: '30 days' })
   declare currentAccessToken?: AccessToken
 
   /**
-   * The groups the user belongs to, through the group_user pivot table
+   * The memberships of the user, each with the role in that organization
    */
-  @manyToMany(() => Group, {
-    pivotTable: 'group_user',
-    pivotForeignKey: 'user_id',
-    pivotRelatedForeignKey: 'group_id',
-  })
-  declare groups: ManyToMany<typeof Group>
+  @hasMany(() => OrganizationMember, { foreignKey: 'userId' })
+  declare memberships: HasMany<typeof OrganizationMember>
 
   /**
-   * The roles of the user, through the role_user pivot table
+   * The organizations of the user, through organization_members ($extras.pivot_role)
    */
-  @manyToMany(() => Role, {
-    pivotTable: 'role_user',
+  @manyToMany(() => Organization, {
+    pivotTable: 'organization_members',
     pivotForeignKey: 'user_id',
-    pivotRelatedForeignKey: 'role_id',
+    pivotRelatedForeignKey: 'organization_id',
+    pivotColumns: ['role', 'status'],
+    pivotTimestamps: true,
   })
-  declare roles: ManyToMany<typeof Role>
+  declare organizations: ManyToMany<typeof Organization>
 
   get initials() {
     const [first, last] = this.fullName ? this.fullName.split(' ') : this.email.split('@')

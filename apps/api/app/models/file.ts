@@ -1,12 +1,12 @@
 import { FileSchema } from '#database/schema'
+import { withFilters } from '#mixins/with_filters'
+import { filters } from '#generated/filters'
 import { withAudit } from '#mixins/with_audit'
-import User from '#models/user'
 import { audit } from '#services/audit'
 import { compose } from '@adonisjs/core/helpers'
 import drive from '@adonisjs/drive/services/main'
-import { belongsTo, scope } from '@adonisjs/lucid/orm'
+import { scope } from '@adonisjs/lucid/orm'
 import type { LucidModel, LucidRow } from '@adonisjs/lucid/types/model'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
 /**
  * How long a download URL stays valid
@@ -21,21 +21,22 @@ function attachableTypeOf(record: LucidRow) {
 }
 
 /**
- * A file stored in S3. It always has an owner (the user who uploaded it), and it can
- * be attached to any one record (polymorphic: attachable_type + attachable_id).
+ * A file stored in S3.
+ *
+ * - owner_id: who the file belongs to, a user or an organization. Not a foreign key
+ *   (it points to either table), so deleting the owner does not delete its files.
+ * - uploaded_by: the user who uploaded it.
+ * - attachable_type + attachable_id: the one record it is attached to, if any (polymorphic).
  *
  * Lucid has no polymorphic relations, so attaching and querying go through the
  * attachTo() method and the attachedTo scope below.
  */
-export default class File extends compose(FileSchema, withAudit()) {
-  @belongsTo(() => User, { foreignKey: 'ownerId' })
-  declare owner: BelongsTo<typeof User>
-
+export default class File extends compose(FileSchema, withAudit(), withFilters(filters.File)) {
   /**
-   * The files of a user: File.query().withScopes((s) => s.ownedBy(user))
+   * The files of a user or an organization: File.query().withScopes((s) => s.ownedBy(user))
    */
-  static ownedBy = scope((query, user: User) => {
-    query.where('owner_id', user.id)
+  static ownedBy = scope((query, owner: { id: string }) => {
+    query.where('owner_id', owner.id)
   })
 
   /**

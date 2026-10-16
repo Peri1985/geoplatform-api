@@ -10,6 +10,7 @@ import type { LucidModel, LucidRow } from '@adonisjs/lucid/types/model'
  *   export default class File extends compose(FileSchema, withAudit()) {}
  *
  * Updates record only the changed fields, as { field: { from, to } }.
+ * After a create, the row is read back, so the model also has the database defaults.
  * Fields in REDACTED_FIELDS (passwords) and in `exclude` are never recorded.
  */
 export function withAudit(options: { exclude?: string[] } = {}) {
@@ -43,6 +44,9 @@ export function withAudit(options: { exclude?: string[] } = {}) {
 
       @afterCreate()
       static async auditCreate(row: Audited) {
+        // Lucid does not read back database defaults (e.g. status = 'active') after an
+        // insert; without them the entry, and later "from" values, would be wrong
+        await row.refresh()
         await record(row, 'created', snapshot(row))
       }
 

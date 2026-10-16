@@ -8,7 +8,15 @@ import { DateTime } from 'luxon'
 /**
  * Fields never written to the audit log, in any model
  */
-export const REDACTED_FIELDS = ['password', 'rememberMeToken']
+export const REDACTED_FIELDS = [
+  'password',
+  'rememberMeToken',
+  'twoFactorSecret',
+  'twoFactorRecoveryCodes',
+  'tokenHash',
+  'keyHash',
+  'secret',
+]
 
 export interface AuditEntry {
   /**

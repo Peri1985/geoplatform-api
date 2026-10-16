@@ -1,3 +1,4 @@
+import paginationConfig from '#config/pagination'
 import File from '#models/file'
 import drive from '@adonisjs/drive/services/main'
 import { test } from '@japa/runner'
@@ -10,6 +11,7 @@ type FileJson = {
   name: string
   mimeType: string
   ownerId: string
+  uploadedBy: string
   size: number
   attachableType: string | null
 }
@@ -25,14 +27,14 @@ test.group('Files', (group) => {
   })
 
   test('need a logged-in user', async ({ client }) => {
-    const response = await client.get('/api/v1/files')
+    const response = await client.get('/v1/files')
     response.assertStatus(401)
   })
 
   test('upload stores the object in S3 and a row with the owner', async ({ client, assert }) => {
     const user = await createUser()
     const response = await client
-      .post('/api/v1/files')
+      .post('/v1/files')
       .file('file', geojson, { filename: 'port.geojson' })
       .loginAs(user)
 
@@ -40,6 +42,7 @@ test.group('Files', (group) => {
     const { file, url } = response.body().data as { file: FileJson; url: string }
     assert.equal(file.name, 'port.geojson')
     assert.equal(file.ownerId, user.id)
+    assert.equal(file.uploadedBy, user.id)
     assert.equal(file.size, geojson.length)
     assert.equal(file.mimeType, 'application/geo+json')
     assert.isNull(file.attachableType)
@@ -53,24 +56,35 @@ test.group('Files', (group) => {
   test('upload rejects file types that are not allowed', async ({ client }) => {
     const user = await createUser()
     const response = await client
-      .post('/api/v1/files')
+      .post('/v1/files')
       .file('file', Buffer.from('echo hi'), { filename: 'script.sh' })
       .loginAs(user)
     response.assertStatus(422)
   })
 
-  test('the list has only the caller files, newest first, in pages', async ({ client, assert }) => {
+  test('the list has only the caller files, newest first, in pages', async ({
+    client,
+    assert,
+    cleanup,
+  }) => {
     const user = await createUser()
     const other = await createUser()
     for (const name of ['a.geojson', 'b.geojson', 'c.geojson']) {
-      await client.post('/api/v1/files').file('file', geojson, { filename: name }).loginAs(user)
+      await client.post('/v1/files').file('file', geojson, { filename: name }).loginAs(user)
     }
     await client
-      .post('/api/v1/files')
+      .post('/v1/files')
       .file('file', geojson, { filename: 'x.geojson' })
       .loginAs(other)
 
-    const response = await client.get('/api/v1/files').qs({ perPage: 2 }).loginAs(user)
+    // The page size comes from config/pagination.ts; smaller here, to need two pages
+    const perPage = paginationConfig.perPage
+    paginationConfig.perPage = 2
+    cleanup(() => {
+      paginationConfig.perPage = perPage
+    })
+
+    const response = await client.get('/v1/files').loginAs(user)
     response.assertStatus(200)
     // GET and POST /files share a URL, so the typed client merges their response types
     const { data, metadata } = response.body() as unknown as {
@@ -89,22 +103,22 @@ test.group('Files', (group) => {
     const owner = await createUser()
     const other = await createUser()
     const upload = await client
-      .post('/api/v1/files')
+      .post('/v1/files')
       .file('file', geojson, { filename: 'port.geojson' })
       .loginAs(owner)
     const { file } = upload.body().data as { file: FileJson }
     const { key } = await File.findOrFail(file.id)
 
-    const showByOther = await client.get(`/api/v1/files/${file.id}`).loginAs(other)
+    const showByOther = await client.get(`/v1/files/${file.id}`).loginAs(other)
     showByOther.assertStatus(404)
-    const deleteByOther = await client.delete(`/api/v1/files/${file.id}`).loginAs(other)
+    const deleteByOther = await client.delete(`/v1/files/${file.id}`).loginAs(other)
     deleteByOther.assertStatus(404)
 
-    const show = await client.get(`/api/v1/files/${file.id}`).loginAs(owner)
+    const show = await client.get(`/v1/files/${file.id}`).loginAs(owner)
     show.assertStatus(200)
     assert.isString((show.body() as { data: { url: string } }).data.url)
 
-    const remove = await client.delete(`/api/v1/files/${file.id}`).loginAs(owner)
+    const remove = await client.delete(`/v1/files/${file.id}`).loginAs(owner)
     remove.assertStatus(204)
     assert.isNull(await File.find(file.id))
     disk.assertMissing(key)
@@ -113,7 +127,7 @@ test.group('Files', (group) => {
   test('a file can be attached to any record (polymorphic)', async ({ client, assert }) => {
     const user = await createUser()
     const upload = await client
-      .post('/api/v1/files')
+      .post('/v1/files')
       .file('file', geojson, { filename: 'avatar.png.geojson' })
       .loginAs(user)
     const file = await File.findOrFail((upload.body().data as { file: FileJson }).file.id)
